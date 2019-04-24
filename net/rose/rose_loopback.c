@@ -54,13 +54,9 @@ int rose_loopback_queue(struct sk_buff *skb, struct rose_neigh *neigh)
 	return 1;
 }
 
-
 static void rose_set_loopback_timer(void)
 {
-	del_timer(&loopback_timer);
-
-	loopback_timer.expires  = jiffies + 10;
-	add_timer(&loopback_timer);
+	mod_timer(&loopback_timer, jiffies + 10);
 }
 
 static void rose_loopback_timer(struct timer_list *unused)
