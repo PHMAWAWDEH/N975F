@@ -136,10 +136,6 @@ static int __init tipc_init(void)
 	if (err)
 		goto out_socket;
 
-	err = register_pernet_device(&tipc_topsrv_net_ops);
-	if (err)
-		goto out_pernet_topsrv;
-
 	err = tipc_bearer_setup();
 	if (err)
 		goto out_bearer;
@@ -147,11 +143,9 @@ static int __init tipc_init(void)
 	pr_info("Started in single node mode\n");
 	return 0;
 out_bearer:
-	unregister_pernet_device(&tipc_topsrv_net_ops);
-out_pernet_topsrv:
 	tipc_socket_stop();
 out_socket:
-	unregister_pernet_device(&tipc_net_ops);
+	unregister_pernet_subsys(&tipc_net_ops);
 out_pernet:
 	tipc_unregister_sysctl();
 out_sysctl:
@@ -166,9 +160,8 @@ out_netlink:
 static void __exit tipc_exit(void)
 {
 	tipc_bearer_cleanup();
-	unregister_pernet_device(&tipc_topsrv_net_ops);
 	tipc_socket_stop();
-	unregister_pernet_device(&tipc_net_ops);
+	unregister_pernet_subsys(&tipc_net_ops);
 	tipc_netlink_stop();
 	tipc_netlink_compat_stop();
 	tipc_unregister_sysctl();
