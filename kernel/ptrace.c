@@ -708,6 +708,10 @@ static int ptrace_peek_siginfo(struct task_struct *child,
 	if (arg.off > ULONG_MAX)
 		return 0;
 
+	/* Ensure arg.off fits in an unsigned long */
+	if (arg.off > ULONG_MAX)
+		return 0;
+
 	if (arg.flags & PTRACE_PEEKSIGINFO_SHARED)
 		pending = &child->signal->shared_pending;
 	else
