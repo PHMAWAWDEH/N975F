@@ -274,7 +274,6 @@ static int proc_dointvec_minmax_bpf_enable(struct ctl_table *table, int write,
 	return ret;
 }
 
-# ifdef CONFIG_HAVE_EBPF_JIT
 static int
 proc_dointvec_minmax_bpf_restricted(struct ctl_table *table, int write,
 				    void __user *buffer, size_t *lenp,
@@ -285,7 +284,6 @@ proc_dointvec_minmax_bpf_restricted(struct ctl_table *table, int write,
 
 	return proc_dointvec_minmax(table, write, buffer, lenp, ppos);
 }
-# endif
 #endif
 
 static struct ctl_table net_core_table[] = {
@@ -395,11 +393,10 @@ static struct ctl_table net_core_table[] = {
 	{
 		.procname	= "bpf_jit_limit",
 		.data		= &bpf_jit_limit,
-		.maxlen		= sizeof(long),
+		.maxlen		= sizeof(int),
 		.mode		= 0600,
-		.proc_handler	= proc_dolongvec_minmax_bpf_restricted,
-		.extra1		= &long_one,
-		.extra2		= &long_max,
+		.proc_handler	= proc_dointvec_minmax_bpf_restricted,
+		.extra1		= &one,
 	},
 #endif
 	{
