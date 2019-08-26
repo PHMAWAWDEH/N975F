@@ -110,15 +110,8 @@ struct gadget_info {
 	bool use_os_desc;
 	char b_vendor_code;
 	char qw_sign[OS_STRING_QW_SIGN_LEN];
-#ifdef CONFIG_USB_CONFIGFS_UEVENT
-	bool enabled;
-	bool connected;
-	bool sw_connected;
-	struct work_struct work;
-	struct device *dev;
-	struct list_head linked_func;
-	bool symboliclink_change_mode;
-#endif
+	spinlock_t spinlock;
+	bool unbind;
 };
 
 static inline struct gadget_info *to_gadget_info(struct config_item *item)
@@ -1549,6 +1542,7 @@ static int configfs_composite_bind(struct usb_gadget *gadget,
 	int				ret;
 
 	/* the gi->lock is hold by the caller */
+	gi->unbind = 0;
 	cdev->gadget = gadget;
 	set_gadget_data(gadget, cdev);
 	ret = composite_dev_prepare(composite, cdev);
@@ -1756,160 +1750,36 @@ static void configfs_composite_unbind(struct usb_gadget *gadget)
 {
 	struct usb_composite_dev	*cdev;
 	struct gadget_info		*gi;
+	unsigned long flags;
 
 	/* the gi->lock is hold by the caller */
 
 	cdev = get_gadget_data(gadget);
 	gi = container_of(cdev, struct gadget_info, cdev);
+	spin_lock_irqsave(&gi->spinlock, flags);
+	gi->unbind = 1;
+	spin_unlock_irqrestore(&gi->spinlock, flags);
 
 	kfree(otg_desc[0]);
 	otg_desc[0] = NULL;
 	purge_configs_funcs(gi);
 	composite_dev_cleanup(cdev);
 	usb_ep_autoconfig_reset(cdev->gadget);
+	spin_lock_irqsave(&gi->spinlock, flags);
 	cdev->gadget = NULL;
-	set_gadget_data(gadget, NULL);
+	set_gadget_data(gadget, NULL);	
 }
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-static void android_gadget_complete(struct usb_ep *ep, struct usb_request *req)
-{
-	if (req->status || req->actual != req->length)
-			printk(KERN_DEBUG "usb: %s: %d, %d/%d\n", __func__,
-				req->status, req->actual, req->length);
-}
-#endif
-#ifdef CONFIG_USB_CONFIGFS_UEVENT
-static int android_setup(struct usb_gadget *gadget,
-			const struct usb_ctrlrequest *c)
-{
-	struct usb_composite_dev *cdev = get_gadget_data(gadget);
-	unsigned long flags;
-	struct gadget_info *gi = container_of(cdev, struct gadget_info, cdev);
-	int value = -EOPNOTSUPP;
-	struct usb_configuration *configuration;
-	struct usb_function *f;
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	struct usb_request		*req = cdev->req;
-
-	req->complete = android_gadget_complete;
-#endif
-
-	spin_lock_irqsave(&cdev->lock, flags);
-	if (!gi->connected) {
-		gi->connected = 1;
-		schedule_work(&gi->work);
-	}
-	spin_unlock_irqrestore(&cdev->lock, flags);
-	list_for_each_entry(configuration, &cdev->configs, list) {
-		list_for_each_entry(f, &configuration->functions, list) {
-			if (f != NULL && f->ctrlrequest != NULL) {
-				value = f->ctrlrequest(f, c);
-				if (value >= 0)
-					break;
-			}
-		}
-	}
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	if (value < 0)
-		value = terminal_ctrl_request(cdev, c);
-#endif
-#ifdef CONFIG_USB_CONFIGFS_F_ACC
-	if (value < 0)
-		value = acc_ctrlrequest_composite(cdev, c);
-#endif
-
-	if (value < 0)
-		value = composite_setup(gadget, c);
-
-	spin_lock_irqsave(&cdev->lock, flags);
-
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	if (c->bRequest == USB_REQ_SET_CONFIGURATION &&
-			cdev->mute_switch == true)
-		cdev->mute_switch = false;
-#endif
-
-	if (c->bRequest == USB_REQ_SET_CONFIGURATION &&
-						cdev->config) {
-		schedule_work(&gi->work);
-	}
-	spin_unlock_irqrestore(&cdev->lock, flags);
-
-	return value;
-}
-
-static void android_disconnect(struct usb_gadget *gadget)
-{
-	struct usb_composite_dev        *cdev = get_gadget_data(gadget);
-	struct gadget_info *gi = container_of(cdev, struct gadget_info, cdev);
-
-	/* FIXME: There's a race between usb_gadget_udc_stop() which is likely
-	 * to set the gadget driver to NULL in the udc driver and this drivers
-	 * gadget disconnect fn which likely checks for the gadget driver to
-	 * be a null ptr. It happens that unbind (doing set_gadget_data(NULL))
-	 * is called before the gadget driver is set to NULL and the udc driver
-	 * calls disconnect fn which results in cdev being a null ptr.
-	 */
-	if (cdev == NULL) {
-		WARN(1, "%s: gadget driver already disconnected\n", __func__);
-		return;
-	}
-
-	/* accessory HID support can be active while the
-		accessory function is not actually enabled,
-		so we need to inform it when we are disconnected.
-	*/
-
-#ifdef CONFIG_USB_CONFIGFS_F_ACC
-	acc_disconnect();
-#endif
-	gi->connected = 0;
-
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	printk(KERN_DEBUG "usb: %s con(%d), sw(%d)\n",
-		 __func__, gi->connected, gi->sw_connected);
-	/* avoid sending a disconnect switch event
-	 * until after we disconnect.
-	 */
-	if (cdev->mute_switch) {
-		gi->sw_connected = gi->connected;
-		printk(KERN_DEBUG"usb: %s mute_switch con(%d) sw(%d)\n",
-			 __func__, gi->connected, gi->sw_connected);
-	} else {
-
-	//	set_ncm_ready(false);
-		if (cdev->force_disconnect) {
-			gi->sw_connected = 1;
-			printk(KERN_DEBUG"usb: %s force_disconnect\n",
-				 __func__);
-			cdev->force_disconnect = 0;
-		}
-		printk(KERN_DEBUG"usb: %s schedule_work con(%d) sw(%d)\n",
-			 __func__, gi->connected, gi->sw_connected);
-		schedule_work(&gi->work);
-	}
-	composite_disconnect(gadget);
-#else
-	schedule_work(&gi->work);
-	composite_disconnect(gadget);
-#endif
-}
-#endif
 
 static const struct usb_gadget_driver configfs_driver_template = {
 	.bind           = configfs_composite_bind,
 	.unbind         = configfs_composite_unbind,
-#ifdef CONFIG_USB_CONFIGFS_UEVENT
-	.setup          = android_setup,
-	.reset          = android_disconnect,
-	.disconnect     = android_disconnect,
-#else
-	.setup          = composite_setup,
-	.reset          = composite_disconnect,
-	.disconnect     = composite_disconnect,
-#endif
-	.suspend	= composite_suspend,
-	.resume		= composite_resume,
+
+	.setup          = configfs_composite_setup,
+	.reset          = configfs_composite_disconnect,
+	.disconnect     = configfs_composite_disconnect,
+
+	.suspend	= configfs_composite_suspend,
+	.resume		= configfs_composite_resume,
 
 	.max_speed	= USB_SPEED_SUPER,
 	.driver = {
