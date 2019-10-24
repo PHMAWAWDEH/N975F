@@ -886,10 +886,27 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
 		return __kpti_forced > 0;
 	}
 
-	return !meltdown_safe;
+	/* Useful for KASLR robustness */
+	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
+		return true;
+
+	/* Don't force KPTI for CPUs that are not vulnerable */
+	switch (read_cpuid_id() & MIDR_CPU_MODEL_MASK) {
+	case MIDR_CAVIUM_THUNDERX2:
+	case MIDR_BRCM_VULCAN:
+	case MIDR_CORTEX_A53:
+	case MIDR_CORTEX_A55:
+	case MIDR_CORTEX_A57:
+	case MIDR_CORTEX_A72:
+	case MIDR_CORTEX_A73:
+		return false;
+	}
+
+	/* Defer to CPU feature registers */
+	return !cpuid_feature_extract_unsigned_field(pfr0,
+						     ID_AA64PFR0_CSV3_SHIFT);
 }
 
-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
 static void
 kpti_install_ng_mappings(const struct arm64_cpu_capabilities *__unused)
 {
@@ -958,22 +975,6 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
 	 */
 	if (!alternatives_applied)
 		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
-}
-#endif
-
-#ifdef CONFIG_ARM64_SSBD
-static int ssbs_emulation_handler(struct pt_regs *regs, u32 instr)
-{
-	if (user_mode(regs))
-		return 1;
-
-	if (instr & BIT(CRm_shift))
-		regs->pstate |= PSR_SSBS_BIT;
-	else
-		regs->pstate &= ~PSR_SSBS_BIT;
-
-	arm64_skip_faulting_instruction(regs, 4);
-	return 0;
 }
 
 static struct undef_hook ssbs_emulation_hook = {
@@ -1328,13 +1329,6 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
 	}
 }
 
-static void update_cpu_capabilities(u16 scope_mask)
-{
-	__update_cpu_capabilities(arm64_features, scope_mask, "detected:");
-	__update_cpu_capabilities(arm64_errata, scope_mask,
-				  "enabling workaround for");
-}
-
 static int __enable_cpu_capability(void *arg)
 {
 	const struct arm64_cpu_capabilities *cap = arg;
@@ -1376,11 +1370,8 @@ __enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
 			 * on_each_cpu() which uses an IPI, giving us a PSTATE
 			 * that disappears when we return.
 			 */
-			if (scope_mask & SCOPE_BOOT_CPU)
-				caps->cpu_enable(caps);
-			else
-				stop_machine(__enable_cpu_capability,
-					     (void *)caps, cpu_online_mask);
+			stop_machine(__enable_cpu_capability, (void *)caps,
+				     cpu_online_mask);
 		}
 	}
 }
@@ -1497,6 +1488,26 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
 		}
 }
 
+static void
+verify_local_cpu_features(const struct arm64_cpu_capabilities *caps_list)
+{
+	const struct arm64_cpu_capabilities *caps = caps_list;
+	for (; caps->matches; caps++) {
+		if (!cpus_have_cap(caps->capability))
+			continue;
+		/*
+		 * If the new CPU misses an advertised feature, we cannot proceed
+		 * further, park the cpu.
+		 */
+		if (!__this_cpu_has_cap(caps_list, caps->capability)) {
+			pr_crit("CPU%d: missing feature: %s\n",
+					smp_processor_id(), caps->desc);
+			cpu_die_early();
+		}
+		if (caps->cpu_enable)
+			caps->cpu_enable(caps);
+	}
+}
 
 /*
  * Run through the enabled system capabilities and enable() it on this CPU.
