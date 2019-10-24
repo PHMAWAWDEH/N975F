@@ -530,10 +530,10 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
 	}
 
 	/*
-	 * Detect and enable early CPU capabilities based on the boot CPU,
-	 * after we have initialised the CPU feature infrastructure.
+	 * Run the errata work around checks on the boot CPU, once we have
+	 * initialised the cpu feature infrastructure.
 	 */
-	setup_boot_cpu_capabilities();
+	update_cpu_errata_workarounds();
 }
 
 static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
