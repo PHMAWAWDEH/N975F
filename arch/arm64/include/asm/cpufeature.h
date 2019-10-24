@@ -108,7 +108,7 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
  *    value of a field in CPU ID feature register or checking the cpu
  *    model. The capability provides a call back ( @matches() ) to
  *    perform the check. Scope defines how the checks should be performed.
- *    There are three cases:
+ *    There are two cases:
  *
  *     a) SCOPE_LOCAL_CPU: check all the CPUs and "detect" if at least one
  *        matches. This implies, we have to run the check on all the
@@ -121,11 +121,6 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
  *        capability relies on a field in one of the CPU ID feature
  *        registers, we use the sanitised value of the register from the
  *        CPU feature infrastructure to make the decision.
- *		Or
- *     c) SCOPE_BOOT_CPU: Check only on the primary boot CPU to detect the
- *        feature. This category is for features that are "finalised"
- *        (or used) by the kernel very early even before the SMP cpus
- *        are brought up.
  *
  *    The process of detection is usually denoted by "update" capability
  *    state in the code.
@@ -145,11 +140,6 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
  *    CPUs are treated "late CPUs" for capabilities determined by the boot
  *    CPU.
  *
- *    At the moment there are two passes of finalising the capabilities.
- *      a) Boot CPU scope capabilities - Finalised by primary boot CPU via
- *         setup_boot_cpu_capabilities().
- *      b) Everything except (a) - Run via setup_system_capabilities().
- *
  * 3) Verification: When a CPU is brought online (e.g, by user or by the
  *    kernel), the kernel should make sure that it is safe to use the CPU,
  *    by verifying that the CPU is compliant with the state of the
@@ -158,21 +148,11 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
  *	secondary_start_kernel()-> check_local_cpu_capabilities()
  *
  *    As explained in (2) above, capabilities could be finalised at
- *    different points in the execution. Each newly booted CPU is verified
- *    against the capabilities that have been finalised by the time it
- *    boots.
- *
- *	a) SCOPE_BOOT_CPU : All CPUs are verified against the capability
- *	except for the primary boot CPU.
- *
- *	b) SCOPE_LOCAL_CPU, SCOPE_SYSTEM: All CPUs hotplugged on by the
- *	user after the kernel boot are verified against the capability.
- *
- *    If there is a conflict, the kernel takes an action, based on the
- *    severity (e.g, a CPU could be prevented from booting or cause a
- *    kernel panic). The CPU is allowed to "affect" the state of the
- *    capability, if it has not been finalised already. See section 5
- *    for more details on conflicts.
+ *    different points in the execution. Each CPU is verified against the
+ *    "finalised" capabilities and if there is a conflict, the kernel takes
+ *    an action, based on the severity (e.g, a CPU could be prevented from
+ *    booting or cause a kernel panic). The CPU is allowed to "affect" the
+ *    state of the capability, if it has not been finalised already.
  *
  * 4) Action: As mentioned in (2), the kernel can take an action for each
  *    detected capability, on all CPUs on the system. Appropriate actions
@@ -190,108 +170,18 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
  *
  *	  check_local_cpu_capabilities() -> verify_local_cpu_capabilities()
  *
- * 5) Conflicts: Based on the state of the capability on a late CPU vs.
- *    the system state, we could have the following combinations :
- *
- *		x-----------------------------x
- *		| Type  | System   | Late CPU |
- *		|-----------------------------|
- *		|  a    |   y      |    n     |
- *		|-----------------------------|
- *		|  b    |   n      |    y     |
- *		x-----------------------------x
- *
- *     Two separate flag bits are defined to indicate whether each kind of
- *     conflict can be allowed:
- *		ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU - Case(a) is allowed
- *		ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU - Case(b) is allowed
- *
- *     Case (a) is not permitted for a capability that the system requires
- *     all CPUs to have in order for the capability to be enabled. This is
- *     typical for capabilities that represent enhanced functionality.
- *
- *     Case (b) is not permitted for a capability that must be enabled
- *     during boot if any CPU in the system requires it in order to run
- *     safely. This is typical for erratum work arounds that cannot be
- *     enabled after the corresponding capability is finalised.
- *
- *     In some non-typical cases either both (a) and (b), or neither,
- *     should be permitted. This can be described by including neither
- *     or both flags in the capability's type field.
  */
 
 
-/*
- * Decide how the capability is detected.
- * On any local CPU vs System wide vs the primary boot CPU
- */
+/* Decide how the capability is detected. On a local CPU vs System wide */
 #define ARM64_CPUCAP_SCOPE_LOCAL_CPU		((u16)BIT(0))
 #define ARM64_CPUCAP_SCOPE_SYSTEM		((u16)BIT(1))
-/*
- * The capabilitiy is detected on the Boot CPU and is used by kernel
- * during early boot. i.e, the capability should be "detected" and
- * "enabled" as early as possibly on all booting CPUs.
- */
-#define ARM64_CPUCAP_SCOPE_BOOT_CPU		((u16)BIT(2))
 #define ARM64_CPUCAP_SCOPE_MASK			\
 	(ARM64_CPUCAP_SCOPE_SYSTEM	|	\
-	 ARM64_CPUCAP_SCOPE_LOCAL_CPU	|	\
-	 ARM64_CPUCAP_SCOPE_BOOT_CPU)
+	 ARM64_CPUCAP_SCOPE_LOCAL_CPU)
 
 #define SCOPE_SYSTEM				ARM64_CPUCAP_SCOPE_SYSTEM
 #define SCOPE_LOCAL_CPU				ARM64_CPUCAP_SCOPE_LOCAL_CPU
-#define SCOPE_BOOT_CPU				ARM64_CPUCAP_SCOPE_BOOT_CPU
-#define SCOPE_ALL				ARM64_CPUCAP_SCOPE_MASK
-
-/*
- * Is it permitted for a late CPU to have this capability when system
- * hasn't already enabled it ?
- */
-#define ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU	((u16)BIT(4))
-/* Is it safe for a late CPU to miss this capability when system has it */
-#define ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	((u16)BIT(5))
-
-/*
- * CPU errata workarounds that need to be enabled at boot time if one or
- * more CPUs in the system requires it. When one of these capabilities
- * has been enabled, it is safe to allow any CPU to boot that doesn't
- * require the workaround. However, it is not safe if a "late" CPU
- * requires a workaround and the system hasn't enabled it already.
- */
-#define ARM64_CPUCAP_LOCAL_CPU_ERRATUM		\
-	(ARM64_CPUCAP_SCOPE_LOCAL_CPU | ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU)
-/*
- * CPU feature detected at boot time based on system-wide value of a
- * feature. It is safe for a late CPU to have this feature even though
- * the system hasn't enabled it, although the featuer will not be used
- * by Linux in this case. If the system has enabled this feature already,
- * then every late CPU must have it.
- */
-#define ARM64_CPUCAP_SYSTEM_FEATURE	\
-	(ARM64_CPUCAP_SCOPE_SYSTEM | ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU)
-/*
- * CPU feature detected at boot time based on feature of one or more CPUs.
- * All possible conflicts for a late CPU are ignored.
- */
-#define ARM64_CPUCAP_WEAK_LOCAL_CPU_FEATURE		\
-	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|	\
-	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	|	\
-	 ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU)
-
-/*
- * CPU feature detected at boot time, on one or more CPUs. A late CPU
- * is not allowed to have the capability when the system doesn't have it.
- * It is Ok for a late CPU to miss the feature.
- */
-#define ARM64_CPUCAP_BOOT_RESTRICTED_CPU_LOCAL_FEATURE	\
-	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|	\
-	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU)
-
-/*
- * CPU feature used early in the boot based on the boot CPU. All secondary
- * CPUs must match the state of the capability as detected by the boot CPU.
- */
-#define ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE ARM64_CPUCAP_SCOPE_BOOT_CPU
 
 struct arm64_cpu_capabilities {
 	const char *desc;
@@ -324,18 +214,6 @@ struct arm64_cpu_capabilities {
 static inline int cpucap_default_scope(const struct arm64_cpu_capabilities *cap)
 {
 	return cap->type & ARM64_CPUCAP_SCOPE_MASK;
-}
-
-static inline bool
-cpucap_late_cpu_optional(const struct arm64_cpu_capabilities *cap)
-{
-	return !!(cap->type & ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU);
-}
-
-static inline bool
-cpucap_late_cpu_permitted(const struct arm64_cpu_capabilities *cap)
-{
-	return !!(cap->type & ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU);
 }
 
 extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);

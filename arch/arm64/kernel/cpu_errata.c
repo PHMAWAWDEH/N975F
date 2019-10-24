@@ -453,104 +453,19 @@ static const struct midr_range arm64_ssb_cpus[] = {
 	{},
 };
 
-#define CAP_MIDR_RANGE(model, v_min, r_min, v_max, r_max)	\
-	.matches = is_affected_midr_range,			\
-	.midr_range = MIDR_RANGE(model, v_min, r_min, v_max, r_max)
+#define MIDR_RANGE(model, min, max) \
+	.type = ARM64_CPUCAP_SCOPE_LOCAL_CPU, \
+	.matches = is_affected_midr_range, \
+	.midr_model = model, \
+	.midr_range_min = min, \
+	.midr_range_max = max
 
-#define CAP_MIDR_ALL_VERSIONS(model)					\
-	.matches = is_affected_midr_range,				\
-	.midr_range = MIDR_ALL_VERSIONS(model)
-
-#define MIDR_FIXED(rev, revidr_mask) \
-	.fixed_revs = (struct arm64_midr_revidr[]){{ (rev), (revidr_mask) }, {}}
-
-#define ERRATA_MIDR_RANGE(model, v_min, r_min, v_max, r_max)		\
-	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,				\
-	CAP_MIDR_RANGE(model, v_min, r_min, v_max, r_max)
-
-#define CAP_MIDR_RANGE_LIST(list)				\
-	.matches = is_affected_midr_range_list,			\
-	.midr_range_list = list
-
-/* Errata affecting a range of revisions of  given model variant */
-#define ERRATA_MIDR_REV_RANGE(m, var, r_min, r_max)	 \
-	ERRATA_MIDR_RANGE(m, var, r_min, var, r_max)
-
-/* Errata affecting a single variant/revision of a model */
-#define ERRATA_MIDR_REV(model, var, rev)	\
-	ERRATA_MIDR_RANGE(model, var, rev, var, rev)
-
-/* Errata affecting all variants/revisions of a given a model */
-#define ERRATA_MIDR_ALL_VERSIONS(model)				\
-	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,			\
-	CAP_MIDR_ALL_VERSIONS(model)
-
-/* Errata affecting a list of midr ranges, with same work around */
-#define ERRATA_MIDR_RANGE_LIST(midr_list)			\
-	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,			\
-	CAP_MIDR_RANGE_LIST(midr_list)
-
-/* Track overall mitigation state. We are only mitigated if all cores are ok */
-static bool __hardenbp_enab = true;
-static bool __spectrev2_safe = true;
-
-/*
- * List of CPUs that do not need any Spectre-v2 mitigation at all.
- */
-static const struct midr_range spectre_v2_safe_list[] = {
-	MIDR_ALL_VERSIONS(MIDR_CORTEX_A35),
-	MIDR_ALL_VERSIONS(MIDR_CORTEX_A53),
-	MIDR_ALL_VERSIONS(MIDR_CORTEX_A55),
-	{ /* sentinel */ }
-};
-
-/*
- * Track overall bp hardening for all heterogeneous cores in the machine.
- * We are only considered "safe" if all booted cores are known safe.
- */
-static bool __maybe_unused
-check_branch_predictor(const struct arm64_cpu_capabilities *entry, int scope)
-{
-	int need_wa;
-
-	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
-
-	/* If the CPU has CSV2 set, we're safe */
-	if (cpuid_feature_extract_unsigned_field(read_cpuid(ID_AA64PFR0_EL1),
-						 ID_AA64PFR0_CSV2_SHIFT))
-		return false;
-
-	/* Alternatively, we have a list of unaffected CPUs */
-	if (is_midr_in_range_list(read_cpuid_id(), spectre_v2_safe_list))
-		return false;
-
-	/* Fallback to firmware detection */
-	need_wa = detect_harden_bp_fw();
-	if (!need_wa)
-		return false;
-
-	__spectrev2_safe = false;
-
-	if (!IS_ENABLED(CONFIG_HARDEN_BRANCH_PREDICTOR)) {
-		pr_warn_once("spectrev2 mitigation disabled by kernel configuration\n");
-		__hardenbp_enab = false;
-		return false;
-	}
-
-	/* forced off */
-	if (__nospectre_v2 || cpu_mitigations_off()) {
-		pr_info_once("spectrev2 mitigation disabled by command line option\n");
-		__hardenbp_enab = false;
-		return false;
-	}
-
-	if (need_wa < 0) {
-		pr_warn_once("ARM_SMCCC_ARCH_WORKAROUND_1 missing from firmware\n");
-		__hardenbp_enab = false;
-	}
-
-	return (need_wa > 0);
-}
+#define MIDR_ALL_VERSIONS(model) \
+	.type = ARM64_CPUCAP_SCOPE_LOCAL_CPU, \
+	.matches = is_affected_midr_range, \
+	.midr_model = model, \
+	.midr_range_min = 0, \
+	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
 
 const struct arm64_cpu_capabilities arm64_errata[] = {
 #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
@@ -651,14 +566,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 		.desc = "Mismatched cache line size",
 		.capability = ARM64_MISMATCHED_CACHE_LINE_SIZE,
 		.matches = has_mismatched_cache_type,
-		.def_scope = SCOPE_LOCAL_CPU,
+		.type = ARM64_CPUCAP_SCOPE_LOCAL_CPU,
 		.cpu_enable = cpu_enable_trap_ctr_access,
 	},
 	{
 		.desc = "Mismatched cache type",
 		.capability = ARM64_MISMATCHED_CACHE_TYPE,
 		.matches = has_mismatched_cache_type,
-		.def_scope = SCOPE_LOCAL_CPU,
+		.type = ARM64_CPUCAP_SCOPE_LOCAL_CPU,
 		.cpu_enable = cpu_enable_trap_ctr_access,
 	},
 #ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
@@ -670,8 +585,8 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 	{
 		.desc = "Qualcomm Technologies Kryo erratum 1003",
 		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1003,
-		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
-		.midr_range.model = MIDR_QCOM_KRYO,
+		.type = ARM64_CPUCAP_SCOPE_LOCAL_CPU,
+		.midr_model = MIDR_QCOM_KRYO,
 		.matches = is_kryo_midr,
 	},
 #endif
@@ -749,7 +664,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 #ifdef CONFIG_ARM64_SSBD
 	{
 		.desc = "Speculative Store Bypass Disable",
-		.def_scope = SCOPE_LOCAL_CPU,
+		.type = ARM64_CPUCAP_SCOPE_LOCAL_CPU,
 		.capability = ARM64_SSBD,
 		.matches = has_ssbd_mitigation,
 	},
