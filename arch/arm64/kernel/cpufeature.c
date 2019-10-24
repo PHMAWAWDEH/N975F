@@ -828,28 +828,7 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
 static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
 				int scope)
 {
-	/* List of CPUs that are not vulnerable and don't need KPTI */
-	static const struct midr_range kpti_safe_list[] = {
-		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
-		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A35),
-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A53),
-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A55),
-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
-	};
-	char const *str = "kpti command line option";
-	bool meltdown_safe;
-
-	meltdown_safe = is_midr_in_range_list(read_cpuid_id(), kpti_safe_list);
-
-	/* Defer to CPU feature registers */
-	if (has_cpuid_feature(entry, scope))
-		meltdown_safe = true;
-
-	if (!meltdown_safe)
-		__meltdown_safe = false;
+	char const *str = "command line option";
 
 	/*
 	 * For reasons that aren't entirely clear, enabling KPTI on Cavium
@@ -903,8 +882,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
 	}
 
 	/* Defer to CPU feature registers */
-	return !cpuid_feature_extract_unsigned_field(pfr0,
-						     ID_AA64PFR0_CSV3_SHIFT);
+	return !has_cpuid_feature(entry, scope);
 }
 
 static void
@@ -1096,7 +1074,15 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
 	{
 		.desc = "Kernel page table isolation (KPTI)",
 		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
-		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
+		.type = ARM64_CPUCAP_BOOT_RESTRICTED_CPU_LOCAL_FEATURE,
+		/*
+		 * The ID feature fields below are used to indicate that
+		 * the CPU doesn't need KPTI. See unmap_kernel_at_el0 for
+		 * more details.
+		 */
+		.sys_reg = SYS_ID_AA64PFR0_EL1,
+		.field_pos = ID_AA64PFR0_CSV3_SHIFT,
+		.min_field_value = 1,
 		.matches = unmap_kernel_at_el0,
 		.cpu_enable = kpti_install_ng_mappings,
 	},
