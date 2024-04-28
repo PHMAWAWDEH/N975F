@@ -150,10 +150,9 @@ clean_build() {
     lpos_defaults
 
     #patching allowlist for non-gki
-    if [ ! -f ".allowlist_patched" ]; then
-        patch -p1 < "$work_dir/ksu.patch"
-        echo "1" > ".allowlist_patched"
-    fi
+    pushd ./KernelSU > /dev/null
+    patch -p1 -t -N < "$work_dir/ksu.patch"
+    popd > /dev/null
 
     make ${ARGS} "$exynos_defconfig"
     make ${ARGS} -j"$(nproc)" || exit
