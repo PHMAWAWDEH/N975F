@@ -47,33 +47,4 @@ jobs:
           path: |
             out/LPoS*.zip
             out/KSU*.zip
-
-      - name: Create release
-        uses: ncipollo/release-action@v1
-        with:
-          tag: ${{ github.event.inputs.tag }}
-          name: "LPoS Kernel ${{ env.LPOS_KERNEL_VERSION }}"
-          draft: false
-          prerelease: false
-          token: ${{ secrets.TOKEN }}          
-          artifacts: "out/LPoS*.zip,out/KSU*.zip"
-          body: "Commit SHA: ${{ github.sha }}"
-
-      - name: Upload to Telegram
-        uses: appleboy/telegram-action@master
-        with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          document: "out/LPoS*.zip,out/KSU*.zip"
-          format: html
-          disable_web_page_preview: false
-          message: |
-            <b>New Kernel Build found..! 🎉</b>
-
-            <b>Device :</b> Note 10+ (d2s)  
-            <b>Kernel Version :</b> ${{ env.LPOS_KERNEL_VERSION }}                    
-            <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
-            
-            <b>Commit SHA:</b> <a href="https://github.com/${{ github.repository }}/commit/${{github.sha}}">Click here</a>
-            
-            <b>Installation :</b> <a href="https://telegra.ph/LPoS-Kernel-Installation-Guide-02-09">Click here</a>          
+   
