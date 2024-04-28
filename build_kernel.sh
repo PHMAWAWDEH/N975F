@@ -117,6 +117,7 @@ permissive() {
 
     # Modify configuration to enable SELinux permissive mode
     replace_config_option "CONFIG_SECURITY_SELINUX_ALWAYS_PERMISSIVE" "y"
+    replace_config_option "CONFIG_SECURITY_SELINUX_ALWAYS_ENFORCING" "n"
     export SELINUX_STATUS="Permissive"
 
     # Perform dirty build
@@ -125,6 +126,7 @@ permissive() {
     # Revert changes back to original configuration
     cd "$work_dir"
     replace_config_option "CONFIG_SECURITY_SELINUX_ALWAYS_PERMISSIVE" "n"
+    replace_config_option "CONFIG_SECURITY_SELINUX_ALWAYS_ENFORCING" "y"
 }
 
 deep_clean(){
@@ -139,6 +141,7 @@ lpos_defaults() {
         sed -i "s/^$1=.*/$1=$2/" "$config_file"
     }
     replace_config_option "CONFIG_KSU" "n"
+    replace_config_option "CONFIG_SECURITY_SELINUX_ALWAYS_ENFORCING" "y"
     replace_config_option "CONFIG_SECURITY_SELINUX_ALWAYS_PERMISSIVE" "n"
 }
 
@@ -184,6 +187,7 @@ build_ksu(){
     ksu_enforce(){
         cd "$work_dir"
         replace_config_option_ksu "CONFIG_KSU" "y"
+        replace_config_option "CONFIG_SECURITY_SELINUX_ALWAYS_ENFORCING" "y"
         replace_config_option_ksu "CONFIG_SECURITY_SELINUX_ALWAYS_PERMISSIVE" "n"
         export SELINUX_STATUS="Enforcing"
     }
@@ -204,6 +208,7 @@ build_ksu(){
         cd "$work_dir"      
         replace_config_option_ksu "CONFIG_KSU" "y"
         replace_config_option_ksu "CONFIG_SECURITY_SELINUX_ALWAYS_PERMISSIVE" "y"
+        replace_config_option "CONFIG_SECURITY_SELINUX_ALWAYS_ENFORCING" "n"
         export SELINUX_STATUS="Permissive"        
     }
 
