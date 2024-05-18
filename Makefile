@@ -976,6 +976,9 @@ KBUILD_CFLAGS	+= $(call cc-option,-ffunction-sections,)
 KBUILD_CFLAGS	+= $(call cc-option,-fdata-sections,)
 endif
 
+# Link with O3
+KBUILD_LDFLAGS += -O3
+
 ifdef CONFIG_LTO_CLANG
 ifdef CONFIG_THINLTO
 lto-clang-flags	:= -flto=thin
