@@ -192,7 +192,7 @@ build_ksu(){
         export SELINUX_STATUS="Enforcing"
     }
 
-    #building with ksu + enforce
+rm -rf drivers/kernelsu ; git clone https://github.com/tiann/KernelSU kernelsu
     build_enforce() {
         cd "$work_dir"
         echo -e "\n\n[+] Compiling KernelSU + Enforcing..\n\n"
