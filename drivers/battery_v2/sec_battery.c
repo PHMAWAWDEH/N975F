@@ -20,6 +20,25 @@
 #include <linux/sti/abc_common.h>
 #endif
 
+#if defined(CONFIG_KUNIT)
+#define __visible_for_testing
+#else
+#define __visible_for_testing static
+#endif
+
+#include <linux/moduleparam.h>
+static int wl_polling = 10;
+module_param(wl_polling, int, 0644);
+
+static unsigned int STORE_MODE_CHARGING_MAX = 90;
+static unsigned int STORE_MODE_CHARGING_MIN = 30;
+module_param_named(store_mode_max, STORE_MODE_CHARGING_MAX, uint, S_IWUSR | S_IRUGO);
+module_param_named(store_mode_min, STORE_MODE_CHARGING_MIN, uint, S_IWUSR | S_IRUGO);
+// module_param_named(store_mode_max, STORE_MODE_CHARGING_MAX, uint, S_IWUSR | S_IRUSR);
+// module_param_named(store_mode_min, STORE_MODE_CHARGING_MIN, uint, S_IWUSR | S_IRUSR);
+
+const char *charger_chip_name;
+
 bool sleep_mode = false;
 bool batt_boot_complete = false;
 
@@ -55,16 +74,22 @@ static enum power_supply_property sec_battery_props[] = {
 
 static enum power_supply_property sec_power_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_VOLTAGE_MAX,
+	POWER_SUPPLY_PROP_CURRENT_MAX,
 };
 
 static enum power_supply_property sec_wireless_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_PRESENT,
+	POWER_SUPPLY_PROP_VOLTAGE_MAX,
+	POWER_SUPPLY_PROP_CURRENT_MAX,
 };
 
 static enum power_supply_property sec_ac_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_TEMP,
+	POWER_SUPPLY_PROP_VOLTAGE_MAX,
+	POWER_SUPPLY_PROP_CURRENT_MAX,
 };
 
 static enum power_supply_property sec_ps_props[] = {
@@ -75,6 +100,8 @@ static enum power_supply_property sec_ps_props[] = {
 static char *supply_list[] = {
 	"battery",
 };
+
+void charger_control_init(struct sec_battery_info *info);
 
 char *sec_cable_type[SEC_BATTERY_CABLE_MAX] = {
 	"UNKNOWN",					/* 0 */
@@ -1769,7 +1796,7 @@ static bool sec_bat_ovp_uvlo_result(
 			__func__, health);
 		battery->is_recharging = false;
 		battery->health_check_count = DEFAULT_HEALTH_CHECK_COUNT;
-		wake_lock_timeout(&battery->vbus_wake_lock, HZ * 10);
+		wake_lock_timeout(&battery->vbus_wake_lock, HZ * wl_polling);
 		/* Enable charging anyway to check actual DC's health */
 		val.intval = SEC_BAT_CHG_MODE_CHARGING_OFF;
 		psy_do_property(battery->pdata->charger_name, set,
@@ -1811,7 +1838,7 @@ static bool sec_bat_ovp_uvlo_result(
 #endif
 			/* Take the wakelock during 10 seconds
 			   when over-voltage status is detected	 */
-			wake_lock_timeout(&battery->vbus_wake_lock, HZ * 10);
+			wake_lock_timeout(&battery->vbus_wake_lock, HZ * wl_polling);
 			break;
 		}
 		power_supply_changed(battery->psy_bat);
@@ -3166,7 +3193,7 @@ static void sec_bat_do_fullcharged(struct sec_battery_info *battery, bool force_
 	 * activated wake lock in a few seconds
 	 */
 	if (battery->pdata->polling_type == SEC_BATTERY_MONITOR_ALARM)
-		wake_lock_timeout(&battery->vbus_wake_lock, HZ * 10);
+		wake_lock_timeout(&battery->vbus_wake_lock, HZ * wl_polling);
 }
 
 static bool sec_bat_fullcharged_check(struct sec_battery_info *battery) {
@@ -3922,9 +3949,11 @@ static void sec_bat_wireless_minduty_cntl(struct sec_battery_info *battery, unsi
 
 static void sec_bat_wireless_uno_cntl(struct sec_battery_info *battery, bool en)
 {
-	union power_supply_propval value = {0, };
+	union power_supply_propval value = {
+		.intval   = en
+	};
 
-	battery->uno_en = value.intval = en;
+	battery->uno_en = en;
 	pr_info("@Tx_Mode %s : Uno control %d\n", __func__, battery->uno_en);
 
 	if (value.intval) {
@@ -4499,7 +4528,7 @@ void sec_bat_fw_update_work(struct sec_battery_info *battery, int mode)
 
 	dev_info(battery->dev, "%s \n", __func__);
 
-	wake_lock_timeout(&battery->vbus_wake_lock, HZ * 10);
+	wake_lock_timeout(&battery->vbus_wake_lock, HZ * wl_polling);
 
 	switch (mode) {
 		case SEC_WIRELESS_RX_SDCARD_MODE:
@@ -5527,7 +5556,7 @@ static void sec_bat_cable_work(struct work_struct *work)
 	 * if cable is connected and disconnected,
 	 * activated wake lock in a few seconds
 	 */
-	wake_lock_timeout(&battery->vbus_wake_lock, HZ * 10);
+	wake_lock_timeout(&battery->vbus_wake_lock, HZ * wl_polling);
 
 	if (is_nocharge_type(battery->cable_type) ||
 		((battery->pdata->cable_check_type &
@@ -6388,8 +6417,22 @@ static int sec_usb_get_property(struct power_supply *psy,
 {
 	struct sec_battery_info *battery = power_supply_get_drvdata(psy);
 
-	if (psp != POWER_SUPPLY_PROP_ONLINE)
+	switch (psp) {
+	case POWER_SUPPLY_PROP_ONLINE:
+		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+		/* V -> uV */
+
+		val->intval = battery->input_voltage * 100000;
+
+		return 0;
+	case POWER_SUPPLY_PROP_CURRENT_MAX:
+		/* mA -> uA */
+		val->intval = battery->pdata->charging_current[battery->cable_type].input_current_limit * 1000;
+		return 0;
+	default:
 		return -EINVAL;
+	}
 
 	if ((battery->health == POWER_SUPPLY_HEALTH_OVERVOLTAGE) ||
 		(battery->health == POWER_SUPPLY_HEALTH_UNDERVOLTAGE)) {
@@ -6466,6 +6509,16 @@ static int sec_ac_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TEMP:
 		val->intval = battery->chg_temp;
 		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+		/* V -> uV */
+
+		val->intval = battery->input_voltage * 100000;
+
+		return 0;
+	case POWER_SUPPLY_PROP_CURRENT_MAX:
+		/* mA -> uA */
+		val->intval = battery->pdata->charging_current[battery->cable_type].input_current_limit * 1000;
+		return 0;
 	case POWER_SUPPLY_PROP_MAX ... POWER_SUPPLY_EXT_PROP_MAX:
 		switch (ext_psp) {
 			case POWER_SUPPLY_EXT_PROP_WATER_DETECT:
@@ -6514,6 +6567,16 @@ static int sec_wireless_get_property(struct power_supply *psy,
 		else
 			val->intval = 0;
 		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+		/* V -> uV */
+
+		val->intval = battery->input_voltage * 100000;
+
+		return 0;
+	case POWER_SUPPLY_PROP_CURRENT_MAX:
+		/* mA -> uA */
+		val->intval = battery->pdata->charging_current[battery->cable_type].input_current_limit * 1000;
+		return 0;
 	default:
 		return -EINVAL;
 	}
@@ -8696,6 +8759,9 @@ static int sec_battery_probe(struct platform_device *pdev)
 
 	dev_info(battery->dev,
 		"%s: SEC Battery Driver Loaded\n", __func__);
+
+	charger_control_init(battery);
+
 	return 0;
 
 err_req_irq:
