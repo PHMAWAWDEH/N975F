@@ -91,6 +91,7 @@
 #include <linux/livepatch.h>
 #include <linux/thread_info.h>
 #include <linux/cpufreq_times.h>
+#include <linux/devfreq_boost.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -2108,6 +2109,7 @@ struct task_struct *fork_idle(int cpu)
 	return task;
 }
 
+extern int kp_active_mode(void);
 /*
  *  Ok, this is the main fork-routine.
  *
@@ -2124,6 +2126,9 @@ long _do_fork(unsigned long clone_flags,
 	struct task_struct *p;
 	int trace = 0;
 	long nr;
+
+	 if (task_is_zygote(current))
+		devfreq_boost_kick_max(DEVFREQ_EXYNOS_MIF, 50);
 
 	/*
 	 * Determine whether and which event to report to ptracer.  When
@@ -2191,7 +2196,6 @@ long _do_fork(unsigned long clone_flags,
 	}
 	return nr;
 }
-
 #ifndef CONFIG_HAVE_COPY_THREAD_TLS
 /* For compatibility with architectures that call do_fork directly rather than
  * using the syscall entry points below. */
