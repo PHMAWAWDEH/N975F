@@ -162,7 +162,7 @@ config ARM_EXYNOS9810_BUS_DEVFREQ
 	  This adds the DEVFREQ driver for Exynos8895 memory and int.
 
 config DEVFREQ_BOOST
-	bool "Devfreq Boost"
+	bool "Devfreq Boost" 
 	help
 	  Boosts enumerated devfreq devices upon input, and allows for boosting
 	  specific devfreq devices on other custom events. The boost frequencies
