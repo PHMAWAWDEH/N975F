@@ -182,6 +182,9 @@ build_ksu(){
     replace_config_option_ksu() {
     sed -i "s/^$1=.*/$1=$2/" "$config_file"
     }
+    
+ #setting up localversion + ksu
+ rm -rf drivers/kernelsu ; git clone https://github.com/tiann/KernelSU kernelsu
 
     #ksu + enforcing
     ksu_enforce(){
@@ -192,7 +195,6 @@ build_ksu(){
         export SELINUX_STATUS="Enforcing"
     }
 
-rm -rf drivers/kernelsu ; git clone https://github.com/tiann/KernelSU kernelsu
     build_enforce() {
         cd "$work_dir"
         echo -e "\n\n[+] Compiling KernelSU + Enforcing..\n\n"
