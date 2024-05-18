@@ -133,8 +133,8 @@ enum misc_battery_health {
 #define STORE_MODE_CHARGING_MAX 80
 #define STORE_MODE_CHARGING_MIN 70
 #else                                       // !SEC_FACTORY, STORE MODE
-// #define STORE_MODE_CHARGING_MAX 70
-// #define STORE_MODE_CHARGING_MIN 60
+#define STORE_MODE_CHARGING_MAX 70
+#define STORE_MODE_CHARGING_MIN 60
 #define STORE_MODE_CHARGING_MAX_VZW 35
 #define STORE_MODE_CHARGING_MIN_VZW 30
 #endif //(CONFIG_SEC_FACTORY)
@@ -687,8 +687,6 @@ extern void select_pdo(int num);
 extern int sec_pd_select_pps(int num, int ppsVol, int ppsCur);
 extern int sec_pd_get_apdo_max_power(unsigned int *pdo_pos, unsigned int *taMaxVol, unsigned int *taMaxCur, unsigned int *taMaxPwr);
 #endif
-
-void charger_control_init(struct sec_battery_info *info);
 
 extern int adc_read(struct sec_battery_info *battery, int channel);
 extern void adc_init(struct platform_device *pdev, struct sec_battery_info *battery);
