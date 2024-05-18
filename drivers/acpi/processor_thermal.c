@@ -158,7 +158,12 @@ void acpi_thermal_cpufreq_exit(void)
 		    (&acpi_thermal_cpufreq_notifier_block,
 		     CPUFREQ_POLICY_NOTIFIER);
 
-	acpi_thermal_cpufreq_is_init = 0;
+for_each_cpu(cpu, policy->related_cpus) {
+		struct acpi_processor *pr = per_cpu(processors, cpu);
+
+		if (pr)
+			freq_qos_remove_request(&pr->thermal_req);
+	}
 }
 
 #else				/* ! CONFIG_CPU_FREQ */
