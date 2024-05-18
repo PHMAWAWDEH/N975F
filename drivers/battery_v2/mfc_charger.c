@@ -2468,7 +2468,7 @@ static void mfc_wpc_rx_power_work(struct work_struct *work)
 
 	union power_supply_propval value;
 
-	pr_info("%s: rx power = %d (0x%x), This W/A is only for Factory\n", __func__, charger->max_power_by_txid);
+	pr_info("%s: rx power = %d, This W/A is only for Factory\n", __func__, charger->max_power_by_txid);
 
 	value.intval = charger->max_power_by_txid;
 	psy_do_property("wireless", set, POWER_SUPPLY_PROP_WIRELESS_RX_POWER, value);
@@ -3902,7 +3902,7 @@ out:
 		case POWER_SUPPLY_EXT_PROP_PAD_VOLT_CTRL:
 			if(charger->pdata->wpc_vout_ctrl_lcd_on) {
 				if (delayed_work_pending(&charger->wpc_vout_mode_work)) {
-					pr_info("%s : Already vout change. skip pad control\n");
+					pr_info("%s : Already vout change. skip pad control\n", __func__);
 					return 0;
 				}
 				if (val->intval && charger->is_afc_tx &&
@@ -5370,8 +5370,8 @@ ssize_t mfc_store_attrs(struct device *dev,
 	struct power_supply *psy = dev_get_drvdata(dev);
 	struct mfc_charger_data *charger = power_supply_get_drvdata(psy);
 	const ptrdiff_t offset = attr - mfc_attrs;	
+	unsigned int header, data_com, data_val;
 	int x, ret;
-	u8 header, data_com, data_val;
 
 	dev_info(charger->dev, "%s \n", __func__);
 
@@ -5399,8 +5399,9 @@ ssize_t mfc_store_attrs(struct device *dev,
 		break;
 	case MFC_PACKET:
 		if (sscanf(buf, "0x%4x 0x%4x 0x%4x\n", &header, &data_com, &data_val) == 3) {
-			dev_info(charger->dev, "%s 0x%x, 0x%x, 0x%x \n", __func__, header, data_com, data_val);
-			mfc_send_packet(charger, header, data_com, &data_val, 1);
+			u8 u8header = header, u8data_com = u8data_com, u8data_val = data_val;
+			dev_info(charger->dev, "%s 0x%x, 0x%x, 0x%x \n", __func__, u8header, u8data_com, u8data_val);
+			mfc_send_packet(charger, u8header, u8data_com, &u8data_val, 1);
 		}
 		ret = count;
 		break;
