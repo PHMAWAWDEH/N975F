@@ -200,7 +200,7 @@ void panic(const char *fmt, ...)
 #endif
 #ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
 	if (strncmp(buf, "Fatal exception", 15))
-		sec_debug_set_extra_info_fault(PANIC_FAULT, (unsigned long)regs.pc, &regs);
+		(SIL_FAULT, (unsigned long)regs.pc, &regs);
 #endif
 	pr_auto(ASL5, "Kernel panic - not syncing: %s\n", buf);
 
