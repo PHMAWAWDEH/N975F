@@ -230,3 +230,4 @@ config MALI_EXYNOS_UNIT_TESTS
     default n
     help
       Choose this option to build unit tests for Mali LSI vendor code
+endif
