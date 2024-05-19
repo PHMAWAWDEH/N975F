@@ -43,11 +43,7 @@
 #include <linux/vmalloc.h>
 #include <linux/wait.h>
 #include <linux/workqueue.h>
-#include <linux/kthread.h>
 #include <linux/interrupt.h>
-
-#include <linux/sched/rt.h>
-#include <uapi/linux/sched/types.h>
 
 #include <uapi/gpu/arm/bv_r38p1/mali_base_kernel.h>
 #include <mali_kbase_linux.h>
@@ -103,9 +99,6 @@
 /*
  * Kernel-side Base (KBase) APIs
  */
-
-#define kbase_event_wakeup_sync(kctx) _kbase_event_wakeup(kctx, true)
-#define kbase_event_wakeup_nosync(kctx) _kbase_event_wakeup(kctx, false)
 
 struct kbase_device *kbase_device_alloc(void);
 /*
@@ -235,7 +228,7 @@ int kbase_jd_submit(struct kbase_context *kctx,
 
 /**
  * kbase_jd_done_worker - Handle a job completion
- * @data: a &struct kthread_work
+ * @data: a &struct work_struct
  *
  * This function requeues the job from the runpool (if it was soft-stopped or
  * removed from NEXT registers).
@@ -250,7 +243,7 @@ int kbase_jd_submit(struct kbase_context *kctx,
  * Handles retrying submission outside of IRQ context if it failed from within
  * IRQ context.
  */
-void kbase_jd_done_worker(struct kthread_work *data);
+void kbase_jd_done_worker(struct work_struct *data);
 
 void kbase_jd_done(struct kbase_jd_atom *katom, int slot_nr, ktime_t *end_timestamp,
 		kbasep_js_atom_done_code done_code);
@@ -397,7 +390,7 @@ int kbase_event_pending(struct kbase_context *ctx);
 int kbase_event_init(struct kbase_context *kctx);
 void kbase_event_close(struct kbase_context *kctx);
 void kbase_event_cleanup(struct kbase_context *kctx);
-void _kbase_event_wakeup(struct kbase_context *kctx, bool sync);
+void kbase_event_wakeup(struct kbase_context *kctx);
 
 /**
  * kbasep_jit_alloc_validate() - Validate the JIT allocation info.
@@ -445,19 +438,6 @@ static inline void kbase_free_user_buffer(
 		kfree(pages);
 	}
 }
-
-/**
- * kbase_mem_copy_from_extres() - Copy from external resources.
- *
- * @kctx:	kbase context within which the copying is to take place.
- * @buf_data:	Pointer to the information about external resources:
- *		pages pertaining to the external resource, number of
- *		pages to copy.
- *
- * Return:      0 on success, error code otherwise.
- */
-int kbase_mem_copy_from_extres(struct kbase_context *kctx,
-		struct kbase_debug_copy_buffer *buf_data);
 
 #if !MALI_USE_CSF
 int kbase_process_soft_job(struct kbase_jd_atom *katom);
@@ -768,22 +748,6 @@ void kbase_device_pcm_dev_term(struct kbase_device *const kbdev);
  * and the number of contexts is >= this value it is reported as a disjoint event
  */
 #define KBASE_DISJOINT_STATE_INTERLEAVED_CONTEXT_COUNT_THRESHOLD 2
-
-/**
- * kbase_create_realtime_thread - Create a realtime thread with an appropriate coremask
- *
- * @kbdev:    the kbase device
- * @threadfn: the function the realtime thread will execute
- * @data:     pointer to the thread's data
- * @namefmt:  a name for the thread.
- *
- * Creates a realtime kthread with priority &KBASE_RT_THREAD_PRIO and restricted
- * to cores defined by &KBASE_RT_THREAD_CPUMASK_MIN and &KBASE_RT_THREAD_CPUMASK_MAX.
- *
- * Return: A valid &struct task_struct pointer on success, or an ERR_PTR on failure.
- */
-struct task_struct * kbase_create_realtime_thread(struct kbase_device *kbdev,
-	int (*threadfn)(void *data), void *data, const char namefmt[]);
 
 #if !defined(UINT64_MAX)
 	#define UINT64_MAX ((uint64_t)0xFFFFFFFFFFFFFFFFULL)
