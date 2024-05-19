@@ -291,12 +291,10 @@ again:
 static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 		       bool *stop_tick)
 {
-	struct menu_device *data = this_cpu_ptr(&menu_devices);	
-	
+	struct menu_device *data = this_cpu_ptr(&menu_devices);
 	struct cpuidle_info *idle_info = this_cpu_ptr(&cpuidle_inf);
 	struct device *device = get_cpu_device(dev->cpu);
-        int latency_req = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);	
-	
+	int latency_req = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
 	int i;
 	int first_idx;
 	int idx;
