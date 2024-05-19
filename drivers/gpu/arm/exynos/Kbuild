@@ -234,4 +234,3 @@ endif
 
 mali_kbase-y += $(FRONTEND_DIR)/gpex_cmar_boost.o
 mali_kbase-$(CONFIG_MALI_SEC_G3D_PEAK_NOTI) += $(WA_DIR)/gpexwa_peak_notify.o
-endif
