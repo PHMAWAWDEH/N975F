@@ -847,11 +847,6 @@ static int kbase_api_mem_alloc(struct kbase_context *kctx,
 	u64 flags = alloc->in.flags;
 	u64 gpu_va;
 
-	/* Calls to this function are inherently asynchronous, with respect to
-	 * MMU operations.
-	 */
-	const enum kbase_caller_mmu_sync_info mmu_sync_info = CALLER_MMU_ASYNC;
-
 	rcu_read_lock();
 	/* Don't allow memory allocation until user space has set up the
 	 * tracking page (which sets kctx->process_mm). Also catches when we've
@@ -881,7 +876,7 @@ static int kbase_api_mem_alloc(struct kbase_context *kctx,
 	reg = kbase_mem_alloc(kctx, alloc->in.va_pages,
 			alloc->in.commit_pages,
 			alloc->in.extent,
-			&flags, &gpu_va, mmu_sync_info);
+			&flags, &gpu_va);
 
 	if (!reg)
 		return -ENOMEM;
@@ -2924,8 +2919,7 @@ static ssize_t set_pm_poweroff(struct device *dev,
 
 	stt = &kbdev->pm.backend.shader_tick_timer;
 	stt->configured_interval = HR_TIMER_DELAY_NSEC(gpu_poweroff_time);
-	stt->default_ticks = poweroff_shader_ticks;
-	stt->configured_ticks = stt->default_ticks;
+	stt->configured_ticks = poweroff_shader_ticks;
 
 	spin_unlock_irqrestore(&kbdev->hwaccess_lock, flags);
 
@@ -2963,7 +2957,7 @@ static ssize_t show_pm_poweroff(struct device *dev,
 	stt = &kbdev->pm.backend.shader_tick_timer;
 	ret = scnprintf(buf, PAGE_SIZE, "%llu %u 0\n",
 			ktime_to_ns(stt->configured_interval),
-			stt->default_ticks);
+			stt->configured_ticks);
 
 	spin_unlock_irqrestore(&kbdev->hwaccess_lock, flags);
 
