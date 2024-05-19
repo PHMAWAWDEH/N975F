@@ -23,13 +23,13 @@ mkdir out || true
 
 #exporting variables
 export current_datetime=$(date +"%Y-%m-%d_%H-%M-%S")
-#export LPOS_KERNEL_VERSION="v8.6.2-stable"
+#export LPOS_KERNEL_VERSION="v9.2-stable"
 export DEVICE="Note 10+"
 export KBUILD_BUILD_USER="@ravindu644"
 export LLVM=1
 export ARCH=arm64
-export PLATFORM_VERSION=12
-export ANDROID_MAJOR_VERSION=s
+export PLATFORM_VERSION=13
+export ANDROID_MAJOR_VERSION=t
 
 export ARGS="
 CC=clang
