@@ -16,6 +16,7 @@
 #include <linux/ktime.h>
 #include <linux/timekeeping.h>
 #include "npu-util-llq.h"
+#include "npu-config.h"
 
 #define NS_TO_MS	1000000
 static inline s64 timespec_sub_to_ms(const struct timespec *lhs, const struct timespec *rhs)
