@@ -16,8 +16,7 @@
 #include <linux/wait.h>
 #include <linux/kthread.h>
 #include <linux/atomic.h>
-#include <npu-config.h>
-	
+
 #define PRINT_NAME_LEN			64
 
 /* TODO: Need to be extended */
