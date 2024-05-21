@@ -32,20 +32,13 @@
 #include <linux/suspend.h>
 #include <trace/events/power.h>
 #include <linux/cpufreq.h>
+#include <linux/cpuidle.h>
 #include <linux/timer.h>
 #include <linux/wakeup_reason.h>
 #include <linux/sec_debug.h>
 
 #include "../base.h"
 #include "power.h"
-
-#ifdef CONFIG_SEC_DEBUG
-#include <linux/sec_debug.h>
-#endif
-
-#ifdef CONFIG_BOEFFLA_WL_BLOCKER
-void pm_print_active_wakeup_sources(void);
-#endif
 
 typedef int (*pm_callback_t)(struct device *);
 
@@ -673,6 +666,7 @@ void dpm_noirq_end(void)
 {
 	resume_device_irqs();
 	device_wakeup_disarm_wake_irqs();
+	cpuidle_resume();
 }
 
 /**
@@ -767,9 +761,6 @@ void dpm_resume_early(pm_message_t state)
 	trace_suspend_resume(TPS("dpm_resume_early"), state.event, true);
 	dbg_snapshot_suspend("dpm_resume_early", dpm_resume_early,
 				NULL, state.event, DSS_FLAG_IN);
-#ifdef CONFIG_BOEFFLA_WL_BLOCKER
-	pm_print_active_wakeup_sources();
-#endif
 	mutex_lock(&dpm_list_mtx);
 	pm_transition = state;
 
@@ -1216,6 +1207,7 @@ static int device_suspend_noirq(struct device *dev)
 
 void dpm_noirq_begin(void)
 {
+	cpuidle_pause();
 	device_wakeup_arm_wake_irqs();
 	suspend_device_irqs();
 }
