@@ -193,10 +193,20 @@ static ssize_t name_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(name);
 
+static ssize_t tpf_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct vision_device *vdev = container_of(dev, struct vision_device, dev);
+
+	return sprintf(buf, "%lld\n", vdev->tpf);
+}
+static DEVICE_ATTR_RO(tpf);
+
 static struct attribute *vision_device_attrs[] = {
 	&dev_attr_name.attr,
 	&dev_attr_debug.attr,
 	&dev_attr_index.attr,
+	&dev_attr_tpf.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(vision_device);
@@ -223,13 +233,15 @@ static void vision_device_release(struct device *dev)
 	/* Delete the cdev on this minor as well */
 	cdev_del(vdev->cdev);
 	/* Just in case some driver tries to access this from
-	   the release() callback. */
+	 * the release() callback.
+	 */
 	vdev->cdev = NULL;
 
 	mutex_unlock(&visiondev_lock);
 
 	/* Release video_device and perform other
-	   cleanups as needed. */
+	 * cleanups as needed.
+	 */
 	vdev->release(vdev);
 }
 
@@ -248,7 +260,7 @@ int vision_register_device(struct vision_device *vdev, int minor, struct module 
 		name_base = "vertex";
 		break;
 	default:
-		printk(KERN_ERR "%s called with unknown type: %d\n", __func__, vdev->type);
+		vision_err("%s called with unknown type: %d\n", __func__, vdev->type);
 		return -EINVAL;
 	}
 
@@ -262,7 +274,7 @@ int vision_register_device(struct vision_device *vdev, int minor, struct module 
 	vdev->cdev->owner = owner;
 	ret = cdev_add(vdev->cdev, MKDEV(VISION_MAJOR, minor), 1);
 	if (ret < 0) {
-		printk(KERN_ERR "%s: cdev_add failed\n", __func__);
+		vision_err("%s: cdev_add failed\n", __func__);
 		kfree(vdev->cdev);
 		vdev->cdev = NULL;
 		goto cleanup;
@@ -275,11 +287,12 @@ int vision_register_device(struct vision_device *vdev, int minor, struct module 
 	dev_set_name(&vdev->dev, "%s%d", name_base, minor);
 	ret = device_register(&vdev->dev);
 	if (ret < 0) {
-		printk(KERN_ERR "%s: device_register failed\n", __func__);
+		vision_err("%s: device_register failed\n", __func__);
 		goto cleanup;
 	}
 	/* Register the release callback that will be called when the last
-	   reference to the device goes away. */
+	 * reference to the device goes away.
+	 */
 	vdev->dev.release = vision_device_release;
 
 
@@ -309,17 +322,17 @@ static int __init visiondev_init(void)
 	int ret;
 	dev_t dev = MKDEV(VISION_MAJOR, 0);
 
-	printk(KERN_INFO "Linux vision interface: v1.00\n");
+	vision_info("Linux vision interface: v1.00\n");
 	ret = register_chrdev_region(dev, VISION_NUM_DEVICES, VISION_NAME);
 	if (ret < 0) {
-		printk(KERN_WARNING "videodev: unable to get major %d\n", VISION_MAJOR);
+		vision_err("videodev: unable to get major %d\n", VISION_MAJOR);
 		return ret;
 	}
 
 	ret = class_register(&vision_class);
 	if (ret < 0) {
 		unregister_chrdev_region(dev, VISION_NUM_DEVICES);
-		printk(KERN_WARNING "video_dev: class_register failed\n");
+		vision_err("video_dev: class_register failed\n");
 		return -EIO;
 	}
 

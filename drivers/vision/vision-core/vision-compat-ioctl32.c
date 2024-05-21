@@ -88,6 +88,11 @@ struct vs4l_buffer32 {
 	compat_caddr_t		reserved;
 };
 
+struct vs4l_sched_param32 {
+	__u32			priority;
+	__u32			bound_id;
+};
+
 struct vs4l_container32 {
 	__u32			type;
 	__u32			target;
@@ -115,6 +120,7 @@ struct vs4l_container_list32 {
 #define VS4L_VERTEXIOC_DQBUF32			_IOW('V', 7, struct vs4l_container_list32)
 #define VS4L_VERTEXIOC_PREPARE32		_IOW('V', 8, struct vs4l_container_list32)
 #define VS4L_VERTEXIOC_UNPREPARE32		_IOW('V', 9, struct vs4l_container_list32)
+#define VS4L_VERTEXIOC_SCHED_PARAM32		_IOW('V', 10, struct vs4l_sched_param32)
 
 static int get_vs4l_graph32(struct vs4l_graph *kp, struct vs4l_graph32 __user *up)
 {
@@ -137,6 +143,26 @@ p_err:
 }
 
 static void put_vs4l_graph32(struct vs4l_graph *kp, struct vs4l_graph32 __user *up)
+{
+}
+
+static int get_vs4l_sched_param32(struct vs4l_sched_param *kp, struct vs4l_sched_param32 __user *up)
+{
+	int ret = 0;
+
+	if (!access_ok(VERIFY_READ, up, sizeof(struct vs4l_sched_param32)) ||
+			get_user(kp->priority, &up->priority) ||
+			get_user(kp->bound_id, &up->bound_id)) {
+		vision_err("get_user is fail1\n");
+		ret = -EFAULT;
+		goto p_err;
+	}
+
+p_err:
+	return ret;
+}
+
+static void put_vs4l_sched_param32(struct vs4l_sched_param *kp, struct vs4l_sched_param32 __user *up)
 {
 }
 
@@ -517,16 +543,12 @@ static int get_vs4l_container32(struct vs4l_container_list *kp, struct vs4l_cont
 
 p_err_container_alloc:
 	for (i = 0; i < kp->count; ++i) {
-		if (kcontainer[i].buffers) {
-			kfree(kcontainer[i].buffers);
-			kcontainer[i].buffers = NULL;
-		}
+		kfree(kcontainer[i].buffers);
+		kcontainer[i].buffers = NULL;
 	}
 
-	if (kp->containers) {
-		kfree(kp->containers);
-		kp->containers = NULL;
-	}
+	kfree(kp->containers);
+	kp->containers = NULL;
 
 p_err:
 	return ret;
@@ -570,6 +592,7 @@ long vertex_compat_ioctl32(struct file *file, unsigned int cmd, unsigned long ar
 		struct vs4l_format_list vsfl;
 		struct vs4l_param_list vspl;
 		struct vs4l_ctrl vsct;
+		struct vs4l_sched_param vsprm;
 		struct vs4l_container_list vscl;
 	} karg;
 	void __user *up = compat_ptr(arg);
@@ -663,8 +686,18 @@ long vertex_compat_ioctl32(struct file *file, unsigned int cmd, unsigned long ar
 		ret = ops->vertexioc_unprepare(file, &karg.vscl);
 		put_vs4l_container32(&karg.vscl, up);
 		break;
+	case VS4L_VERTEXIOC_SCHED_PARAM32:
+		ret = get_vs4l_sched_param32(&karg.vsprm, up);
+		if (ret) {
+			vision_err("qbuf, get_vs4l_sched_param32 is fail(%ld)\n", ret);
+			goto p_err;
+		}
+		ret = ops->vertexioc_sched_param(file, &karg.vsprm);
+		put_vs4l_sched_param32(&karg.vsprm, up);
+		break;
 	default:
-		vision_err("%x iocontrol is not supported(%lx, %zd)\n", cmd, VS4L_VERTEXIOC_S_FORMAT, sizeof(struct vs4l_format_list));
+		vision_err("%x iocontrol is not supported(%lx, %zd)\n", cmd, VS4L_VERTEXIOC_S_FORMAT,
+				sizeof(struct vs4l_format_list));
 		break;
 	}
 
