@@ -38,34 +38,34 @@ extern "C" {
  * @flags: Amigo flag set by Amigo module
  */
 struct mali_exynos_ioctl_amigo_flags {
-	__u32 flags;
+    __u32 flags;
 };
 
 #define MALI_EXYNOS_IOCTL_AMIGO_FLAGS \
-	_IOR(KBASE_IOCTL_EXTRA_TYPE, 0, struct mali_exynos_ioctl_amigo_flags)
+    _IOR(KBASE_IOCTL_EXTRA_TYPE, 0, struct mali_exynos_ioctl_amigo_flags)
 
 /*
  * struct kbase_ioctl_slsi_util_info - Read gpu utilization info
  */
 struct mali_exynos_ioctl_gts_info {
-	__u32 util_avg;
-	__u32 hcm_mode;
-	__u64 out_data[4];
-	__u64 input;
-	__u64 input2;
-	__u64 freq;
-	__u64 flimit;
+    __u32 util_avg;
+    __u32 hcm_mode;
+    __u64 out_data[4];
+    __u64 input;
+    __u64 input2;
+    __u64 freq;
+    __u64 flimit;
 };
 
 #define MALI_EXYNOS_IOCTL_READ_GTS_INFO \
-	_IOR(KBASE_IOCTL_EXTRA_TYPE, 1, struct mali_exynos_ioctl_gts_info)
+    _IOR(KBASE_IOCTL_EXTRA_TYPE, 1, struct mali_exynos_ioctl_gts_info)
 
 struct mali_exynos_ioctl_hcm_pmqos {
-	__u32 mode;
+    __u32 mode;
 };
 
 #define MALI_EXYNOS_IOCTL_HCM_PMQOS \
-	_IOW(KBASE_IOCTL_EXTRA_TYPE, 2, struct mali_exynos_ioctl_hcm_pmqos)
+    _IOW(KBASE_IOCTL_EXTRA_TYPE, 2, struct mali_exynos_ioctl_hcm_pmqos)
 
 /**
  * struct mali_exynos_ioctl_mem_usage_add - Provide gpu memory usage information to kernel
@@ -74,11 +74,11 @@ struct mali_exynos_ioctl_hcm_pmqos {
  * The data provided is accessible through a sysfs file
  */
 struct mali_exynos_ioctl_mem_usage_add {
-	__u64 gl_mem_usage;
+    __u64 gl_mem_usage;
 };
 
 #define MALI_EXYNOS_IOCTL_MEM_USAGE_ADD \
-	_IOW(KBASE_IOCTL_EXTRA_TYPE, 3, struct mali_exynos_ioctl_mem_usage_add)
+    _IOW(KBASE_IOCTL_EXTRA_TYPE, 3, struct mali_exynos_ioctl_mem_usage_add)
 
 /*
  * DEFAULT: is in default sched (SCHED_NORMAL)
@@ -87,10 +87,10 @@ struct mali_exynos_ioctl_mem_usage_add {
  * SET_DEFAULT: attempt to set back to default sched
  */
 typedef enum cmar_boost_flag {
-	CMAR_BOOST_DEFAULT = 1u << 0,
-	CMAR_BOOST_USER_RT = 1u << 1,
-	CMAR_BOOST_SET_RT = 1u << 2,
-	CMAR_BOOST_SET_DEFAULT = 1u << 3,
+    CMAR_BOOST_DEFAULT = 1u << 0,
+    CMAR_BOOST_USER_RT = 1u << 1,
+    CMAR_BOOST_SET_RT = 1u << 2,
+    CMAR_BOOST_SET_DEFAULT = 1u << 3,
 } cmar_boost_flag;
 
 /*
@@ -98,20 +98,31 @@ typedef enum cmar_boost_flag {
  * @flags: stores cmar_boost_flag
  */
 struct mali_exynos_ioctl_cmar_boost {
-	__u32 flags;
+    __u32 flags;
 };
 
 #define MALI_EXYNOS_IOCTL_CMAR_BOOST \
-	_IOW(KBASE_IOCTL_EXTRA_TYPE, 4, struct mali_exynos_ioctl_cmar_boost)
+    _IOW(KBASE_IOCTL_EXTRA_TYPE, 4, struct mali_exynos_ioctl_cmar_boost)
 
 /* GPU Profiler - CONFIG_MALI_TSG */
 struct kbase_ioctl_slsi_egp {
-	__u64 start_timestamp;
-	__u64 end_timestamp;
+    __u64 start_timestamp;
+    __u64 end_timestamp;
 };
 
 #define KBASE_IOCTL_SLSI_EGP \
        _IOW(KBASE_IOCTL_EXTRA_TYPE, 5, struct kbase_ioctl_slsi_egp)
+
+/*
+ * struct mali_exynos_ioctl_interactive_boost - boost to interactive clock
+ * @duration: boost duration in msec
+ */
+struct mali_exynos_ioctl_interactive_boost {
+    __u64 duration;
+};
+
+#define MALI_EXYNOS_IOCTL_INTERACTIVE_BOOST \
+       _IOW(KBASE_IOCTL_EXTRA_TYPE, 6, struct mali_exynos_ioctl_interactive_boost)
 
 /*** Legacy IOCTLs for backward compatibility ***/
 
@@ -120,11 +131,11 @@ struct kbase_ioctl_slsi_egp {
  * @flags: Flags for future expansion
  */
 struct kbase_ioctl_slsi_singlebuffer_boost_flags {
-	__u32 flags;
+    __u32 flags;
 };
 
 #define KBASE_IOCTL_SLSI_SINGLEBUFFER_BOOST_FLAGS \
-	_IOW(KBASE_IOCTL_TYPE, 46, struct kbase_ioctl_slsi_singlebuffer_boost_flags)
+    _IOW(KBASE_IOCTL_TYPE, 46, struct kbase_ioctl_slsi_singlebuffer_boost_flags)
 
 #ifdef __cpluscplus
 }
