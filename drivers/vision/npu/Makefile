@@ -22,6 +22,8 @@ obj-y					+= npu-queue.o
 obj-y					+= npu-if-session-protodrv.o
 obj-y					+= npu-if-protodrv-mbox2.o
 obj-y					+= npu-sessionmgr.o
+obj-y					+= npu/npu-config.o
+
 npu-objs			+= npu/core/npu-config.o
 npu-objs		                += npu/core/npu-util-autosleepthr.o
 obj-$(CONFIG_NPU_INTERFACE)	+= interface/
