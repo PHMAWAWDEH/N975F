@@ -1,4 +1,4 @@
-obj-y		                   += npu-util-autosleepthr.o
+obj-y		                 += npu-util-autosleepthr.o
 obj-y					+= npu-util-liststatemgr.o
 obj-y					+= npu-util-msgidgen.o
 obj-y					+= npu-util-regs.o
