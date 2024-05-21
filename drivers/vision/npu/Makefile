@@ -1,4 +1,4 @@
-obj-y		                        += npu-util-autosleepthr.o
+obj-y		      += npu-util-autosleepthr.o
 obj-y					+= npu-util-liststatemgr.o
 obj-y					+= npu-util-msgidgen.o
 obj-y					+= npu-util-regs.o
@@ -22,6 +22,7 @@ obj-y					+= npu-queue.o
 obj-y					+= npu-if-session-protodrv.o
 obj-y					+= npu-if-protodrv-mbox2.o
 obj-y					+= npu-sessionmgr.o
+npu-objs			+= npu/core/npu-config.o
 obj-$(CONFIG_NPU_INTERFACE)	+= interface/
 obj-$(CONFIG_NPU_GOLDEN_MATCH)	        += npu-golden.o
 obj-$(CONFIG_NPU_GOLDEN_MATCH)	        += npu-util-statekeeper.o
