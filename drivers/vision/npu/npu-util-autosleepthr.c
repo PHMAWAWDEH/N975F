@@ -15,7 +15,7 @@
 #include <linux/types.h>
 #include <linux/atomic.h>
 #include <asm/barrier.h>
-
+#include "npu-config.h"
 #include "npu-log.h"
 
 #include "npu-util-autosleepthr.h"
