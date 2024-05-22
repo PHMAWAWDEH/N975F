@@ -25,7 +25,7 @@ Required properties:
 
 - compatible : Should be mali<chip>, replacing digits with x from the back,
 until malit<Major>xx, and it must end with one of: "arm,malit6xx" or
-"arm,mali-midgard" or "arm,mali-bifrost"
+"arm,mali-bv_r48p0" or "arm,mali-bifrost"
 - reg : Physical base address of the device and length of the register area.
 - interrupts : Contains the three IRQ lines required by T-6xx devices
 - interrupt-names : Contains the names of IRQ resources in the order they were
@@ -138,7 +138,7 @@ for details.
 Example for a Mali GPU with 1 clock and 1 regulator:
 
 gpu@0xfc010000 {
-	compatible = "arm,malit602", "arm,malit60x", "arm,malit6xx", "arm,mali-midgard";
+	compatible = "arm,malit602", "arm,malit60x", "arm,malit6xx", "arm,mali-bv_r48p0";
 	reg = <0xfc010000 0x4000>;
 	interrupts = <0 36 4>, <0 37 4>, <0 38 4>;
 	interrupt-names = "JOB", "MMU", "GPU";
@@ -200,7 +200,7 @@ gpu_opp_table: opp_table0 {
 Example for a Mali GPU with 2 clocks and 2 regulators:
 
 gpu: gpu@6e000000 {
-	compatible = "arm,mali-midgard";
+	compatible = "arm,mali-bv_r48p0";
 	reg = <0x0 0x6e000000 0x0 0x200000>;
 	interrupts = <0 168 4>, <0 168 4>, <0 168 4>;
 	interrupt-names = "JOB", "MMU", "GPU";
