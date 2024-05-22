@@ -160,9 +160,6 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 	/* exclude debugging symbols */
 	else if (stype == 'N' || stype == 'n')
 		return -1;
-	/* exclude s390 kasan local symbols */
-	else if (!strncmp(sym, ".LASANPC", 8))
-		return -1;
 
 	/* include the type field in the symbol name, so that it gets
 	 * compressed together */
@@ -510,8 +507,6 @@ static void build_initial_tok_table(void)
 				table[pos] = table[i];
 			learn_symbol(table[pos].sym, table[pos].len);
 			pos++;
-		} else {
-			free(table[i].sym);
 		}
 	}
 	table_cnt = pos;
@@ -757,15 +752,11 @@ static void record_relative_base(void)
 {
 	unsigned int i;
 
+	relative_base = -1ULL;
 	for (i = 0; i < table_cnt; i++)
-		if (!symbol_absolute(&table[i])) {
-			/*
-			 * The table is sorted by address.
-			 * Take the first non-absolute symbol value.
-			 */
+		if (!symbol_absolute(&table[i]) &&
+		    table[i].addr < relative_base)
 			relative_base = table[i].addr;
-			return;
-		}
 }
 
 int main(int argc, char **argv)
@@ -794,9 +785,9 @@ int main(int argc, char **argv)
 	read_map(stdin);
 	if (absolute_percpu)
 		make_percpus_absolute();
-	sort_symbols();
 	if (base_relative)
 		record_relative_base();
+	sort_symbols();
 	optimize_token_table();
 	write_src();
 
