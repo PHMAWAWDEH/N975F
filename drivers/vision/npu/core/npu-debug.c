@@ -18,6 +18,7 @@
 #include <linux/slab.h>
 #include <asm/bitops.h>
 
+#include "npu-config.h"
 #include "npu-debug.h"
 #include "npu-log.h"
 #include "npu-ver.h"
