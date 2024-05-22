@@ -43,9 +43,6 @@
 /* npu_queue and vb_queue constants */
 /* Maximum number of index allowed for mapping */
 #define NPU_MAX_BUFFER			16
-
-#define NPU_MAILBOX_DEFAULT_TID         0
-
 #ifdef CONFIG_NPU_HARDWARE
 /* ioremap area definition of NPU IP */
 /* TODO: Those constants shall be read from DT later */
@@ -93,14 +90,19 @@
 #define TCNTO0_OFF                      0x0014
 
 /* Definition for ZEBU */
+//#define ZEBU_EMULATION
 #ifdef CONFIG_NPU_HARDWARE
 //[BAE]
 #define FORCE_HWACG_DISABLE
 /* #define FORCE_WDT_DISABLE */
+#define NPU_MAILBOX_DEFAULT_TID         0
 
 #ifdef CONFIG_NPU_ZEBU_EMULATION
 #define NPU_CM7_RELEASE_HACK
+//#define CLEAR_ON_SECOND_LOAD_ONLY
+//#define CONFIG_FIRMWARE_SRAM_DUMP_DEBUGFS       /* defined in npu-util-memdump.[ch] */
 #define T32_GROUP_TRACE_SUPPORT
+//#define REINIT_NPU_BAAW
 #endif
 #endif  /* CONFIG_NPU_ZEBU_EMULATION */
 
@@ -110,9 +112,9 @@
 
 /* Start address of firmware address space */
 #define NPU_FW_BASE_ADDR                0
-#endif
 
 /* Skip sending PURGE command(Trigerred by STREAM_OFF) to NPU H/W */
+//#define BYPASS_HW_STREAMOFF
 
 /*
  * Mailbox size configuration
@@ -122,12 +124,15 @@
 #define NPU_MAILBOX_HDR_SECTION_LEN	(4 * K_SIZE)
 #define NPU_MAILBOX_SIZE		(32 * K_SIZE)
 #define NPU_MAILBOX_BASE		0x80000
-
+#endif
 
 /* WA to prevent TCU hang */
+//#define CLKGate1_DRCG_EN
 #define CLKGate23_SOC_HWACG
 #define CLKGate4_IP_HWACG
+//#define CLKGate5_IP_DRCG_EN
 
+//#define MBOX_MOCK_ENABLE
 
 /*
  * Delay insearted before streamoff and power down sequence on EMERGENCY.

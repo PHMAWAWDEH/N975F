@@ -21,27 +21,24 @@
 #include <asm/cacheflush.h>
 
 #define DEBUG_SENTENCE_MAX	300
-#define TERM_SIZE		50
 
 struct vision_debug_log {
 	size_t			dsentence_pos;
-	char			*dsentence/*[DEBUG_SENTENCE_MAX]*/;
+	char			dsentence[DEBUG_SENTENCE_MAX];
 };
 
 void vision_dmsg_concate(struct vision_debug_log *log, const char *fmt, ...)
 {
 	va_list ap;
-	char *term/*[50]*/;
+	char term[50];
 	size_t copy_len;
 
-	term = kmalloc(TERM_SIZE, GFP_KERNEL);
 	va_start(ap, fmt);
-	vsnprintf(term, TERM_SIZE/*sizeof(term)*/, fmt, ap);
+	vsnprintf(term, sizeof(term), fmt, ap);
 	va_end(ap);
 
 	if (log->dsentence_pos >= DEBUG_SENTENCE_MAX) {
 		vision_err("debug message(%zd) over max\n", log->dsentence_pos);
-		kfree(term);
 		return;
 	}
 
@@ -49,7 +46,6 @@ void vision_dmsg_concate(struct vision_debug_log *log, const char *fmt, ...)
 	strncpy(log->dsentence + log->dsentence_pos, term, copy_len);
 	log->dsentence_pos += copy_len;
 	log->dsentence[log->dsentence_pos] = 0;
-	kfree(term);
 }
 
 char *vision_dmsg_print(struct vision_debug_log *log)
@@ -59,14 +55,10 @@ char *vision_dmsg_print(struct vision_debug_log *log)
 }
 
 #define DLOG_INIT() \
-	struct vision_debug_log vision_debug_log;	\
-	vision_debug_log.dsentence_pos = 0;		\
-	vision_debug_log.dsentence = kmalloc(DEBUG_SENTENCE_MAX, GFP_KERNEL);
+	struct vision_debug_log vision_debug_log = {.dsentence_pos = 0}
 #define DLOG(fmt, ...) \
 	vision_dmsg_concate(&vision_debug_log, fmt, ##__VA_ARGS__)
 #define DLOG_OUT() vision_dmsg_print(&vision_debug_log)
-#define DLOG_DEINIT() \
-	kfree(vision_debug_log.dsentence)
 
 struct vb_fmt vb_fmts[] = {
 	{
@@ -134,8 +126,8 @@ struct vb_fmt vb_fmts[] = {
 
 void __vb_queue_print(struct vb_queue *q)
 {
-	struct vb_bundle *bundle, *temp;
 	DLOG_INIT();
+	struct vb_bundle *bundle, *temp;
 
 	DLOG("[VB] queued(%d) :", atomic_read(&q->queued_count));
 	list_for_each_entry_safe(bundle, temp, &q->queued_list, queued_entry) {
@@ -161,7 +153,6 @@ void __vb_queue_print(struct vb_queue *q)
 	DLOG("X");
 
 	vision_info("%s\n", DLOG_OUT());
-	DLOG_DEINIT();
 }
 
 void __vb_buffer_print(struct vs4l_container_list *c)
@@ -175,7 +166,6 @@ static struct vb_fmt *__vb_find_format(u32 colorspace)
 {
 	size_t i;
 	struct vb_fmt *fmt = NULL;
-
 	for (i = 0; i < ARRAY_SIZE(vb_fmts); ++i) {
 		if (vb_fmts[i].colorspace == colorspace) {
 			fmt = &vb_fmts[i];
@@ -190,7 +180,6 @@ static int __vb_plane_size(struct vb_format *format)
 	int ret = 0;
 	u32 plane;
 	struct vb_fmt *fmt;
-
 	BUG_ON(!format);
 	fmt = format->fmt;
 	if (fmt->planes > VB_MAX_PLANES) {
@@ -222,17 +211,15 @@ static int __vb_unmap_dmabuf(struct vb_queue *q, struct vb_buffer *buffer)
 		ret = -EFAULT;
 		goto p_err;
 	}
-
-	if (buffer->vaddr)
+	if (!IS_ERR_OR_NULL(buffer->vaddr))
 		dma_buf_vunmap(buffer->dma_buf, buffer->vaddr);
-	if (buffer->daddr)
+	if (buffer->daddr && !IS_ERR_VALUE(buffer->daddr))
 		ion_iovmm_unmap(buffer->attachment, buffer->daddr);
-	if (buffer->sgt)
-		dma_buf_unmap_attachment(
-			buffer->attachment, buffer->sgt, DMA_BIDIRECTIONAL);
-	if (buffer->attachment)
+	if (!IS_ERR_OR_NULL(buffer->sgt))
+		dma_buf_unmap_attachment(buffer->attachment, buffer->sgt, DMA_BIDIRECTIONAL);
+	if (!IS_ERR_OR_NULL(buffer->attachment) && !IS_ERR_OR_NULL(buffer->dma_buf))
 		dma_buf_detach(buffer->dma_buf, buffer->attachment);
-	if (buffer->dma_buf)
+	if (!IS_ERR_OR_NULL(buffer->dma_buf))
 		dma_buf_put(buffer->dma_buf);
 
 	buffer->attachment = NULL;
@@ -298,12 +285,6 @@ static int __vb_map_dmabuf(
 	}
 	buffer->dma_buf = dma_buf;
 
-	if (buffer->dma_buf->size < size) {
-		vision_err("Allocate buffer size(%zu) is smaller than expectation(%u)\n",
-			buffer->dma_buf->size, size);
-		ret = -EINVAL;
-		goto p_err;
-	}
 
 	attachment = dma_buf_attach(buffer->dma_buf, q->alloc_ctx);
 	if (IS_ERR(attachment)) {
@@ -321,7 +302,7 @@ static int __vb_map_dmabuf(
 
 	daddr = ion_iovmm_map(attachment, 0, size, DMA_BIDIRECTIONAL, 0);
 	if (IS_ERR_VALUE(daddr)) {
-		vision_err("Failed to allocate iova (err 0x%pK)\n", &daddr);
+		vision_err("Failed to allocate iova (err %pad)\n", &daddr);
 		ret = -ENOMEM;
 		goto p_err;
 	}
@@ -329,7 +310,7 @@ static int __vb_map_dmabuf(
 
 	vaddr = dma_buf_vmap(buffer->dma_buf);
 	if (IS_ERR_OR_NULL(vaddr)) {
-		vision_err("Failed to get vaddr (err 0x%pK)\n", &vaddr);
+		vision_err("Failed to get vaddr (err %pK)\n", vaddr);
 		ret = -EFAULT;
 		goto p_err;
 	}
@@ -381,6 +362,7 @@ p_err:
 static int __vb_queue_alloc(struct vb_queue *q,
 	struct vs4l_container_list *c)
 {
+	DLOG_INIT();
 	int ret = 0;
 	u32 i, j;
 	size_t alloc_size;
@@ -390,7 +372,6 @@ static int __vb_queue_alloc(struct vb_queue *q,
 	struct vb_container_list *clist;
 	struct vb_container *container;
 	struct vb_buffer *buffer;
-	DLOG_INIT();
 
 	BUG_ON(!q);
 	BUG_ON(!c);
@@ -399,8 +380,8 @@ static int __vb_queue_alloc(struct vb_queue *q,
 	flist = &q->format;
 
 	/* allocation */
-	if (c->count > VB_MAX_CONTAINERLIST) {
-		vision_err("c->count(%d) cannot be greater to VB_MAX_CONTAINERLIST(%d)\n", c->count, VB_MAX_CONTAINERLIST);
+	if (c->count > VB_MAX_BUFFER) {
+		vision_err("c->count(%d) cannot be greater to VB_MAX_BUFFER(%d)\n", c->count, VB_MAX_BUFFER);
 		ret = -EINVAL;
 		goto p_err;
 	}
@@ -439,8 +420,6 @@ static int __vb_queue_alloc(struct vb_queue *q,
 	clist->direction = c->direction;
 	clist->count = c->count;
 	clist->flags = c->flags;
-	if (c->timestamp[5].tv_sec)
-		clist->timestamp[5].tv_sec = c->timestamp[5].tv_sec;
 
 	for (i = 0; i < clist->count; ++i) {
 		container = &clist->containers[i];
@@ -487,7 +466,6 @@ static int __vb_queue_alloc(struct vb_queue *q,
 	q->num_buffers++;
 
 p_err:
-	DLOG_DEINIT();
 	return ret;
 }
 
@@ -550,8 +528,6 @@ static int __vb_queue_check(struct vb_bundle *bundle,
 
 	clist->flags = c->flags;
 	clist->id = c->id;
-	if (c->timestamp[5].tv_sec)
-		clist->timestamp[5].tv_sec = c->timestamp[5].tv_sec;
 
 	for (i = 0; i < clist->count; ++i) {
 		container = &clist->containers[i];
@@ -850,8 +826,6 @@ static void __fill_vs4l_buffer(struct vb_bundle *bundle,
 
 	c->index = clist->index;
 	c->id = clist->id;
-	if(clist->timestamp[5].tv_sec == 1)
-		c->timestamp[5].tv_usec = clist->timestamp[5].tv_usec;
 }
 
 static void __vb_dqbuf(struct vb_bundle *bundle)
@@ -921,13 +895,13 @@ int vb_queue_s_format(struct vb_queue *q, struct vs4l_format_list *flist)
 	}
 
 	if (q->format.count > VB_MAX_BUFFER) {
-		vision_err("flist->count(%d) cannot be greater to VB_MAX_BUFFER(%d)\n", flist->count, VB_MAX_BUFFER);
-		ret = -EINVAL;
-		if (q->format.formats)
-			kfree(q->format.formats);
-		q->format.formats = NULL;
-		goto p_err;
-	}
+			vision_err("flist->count(%d) cannot be greater to VB_MAX_BUFFER(%d)\n", flist->count, VB_MAX_BUFFER);
+			ret = -EINVAL;
+			if (q->format.formats)
+				kfree(q->format.formats);
+			q->format.formats = NULL;
+			goto p_err;
+		}
 
 	for (i = 0; i < flist->count; ++i) {
 		f = &flist->formats[i];
@@ -1096,7 +1070,6 @@ static int __vb_queue_stop(struct vb_queue *q, int is_forced)
 		BUG();
 	}
 	clear_bit(VB_QUEUE_STATE_START, &q->state);
-
 p_err:
 	if (!is_forced)
 		return ret;
@@ -1129,19 +1102,10 @@ int vb_queue_qbuf(struct vb_queue *q, struct vs4l_container_list *c)
 		goto p_err;
 	}
 
-	if (c->index >= VB_MAX_CONTAINERLIST) {
-		vision_err("qbuf: invalid container list index\n");
+	if (c->index >= VB_MAX_BUFFER) {
+		vision_err("qbuf: buffer index out of range\n");
 		ret = -EINVAL;
 		goto p_err;
-	}
-
-	for (i = 0; i < c->count; i++) {
-		if (c->containers[i].count > VB_MAX_BUFFER) {
-			vision_err("qbuf: Max buffers are %d; passed %d buffers\n",
-				VB_MAX_BUFFER, c->containers[i].count);
-			ret = -EINVAL;
-			goto p_err;
-		}
 	}
 
 	bundle = q->bufs[c->index];
@@ -1204,7 +1168,6 @@ int vb_queue_qbuf(struct vb_queue *q, struct vs4l_container_list *c)
 	list_add_tail(&bundle->queued_entry, &q->queued_list);
 	bundle->state = VB_BUF_STATE_QUEUED;
 	atomic_inc(&q->queued_count);
-
 p_err:
 	return ret;
 }
@@ -1221,7 +1184,7 @@ int vb_queue_prepare(struct vb_queue *q, struct vs4l_container_list *c)
 		goto p_err;
 	}
 
-	if (c->index >= VB_MAX_CONTAINERLIST) {
+	if (c->index >= VB_MAX_BUFFER) {
 		vision_err("qbuf: invalid container list index\n");
 		ret = -EINVAL;
 		goto p_err;
@@ -1292,7 +1255,6 @@ int vb_queue_unprepare(struct vb_queue *q, struct vs4l_container_list *c)
 			vision_err("__vb_queue_check is fail(%d)\n", ret);
 			goto p_err;
 		}
-
 	} else {
 		vision_err("__vb_bundle doesn't exist(%d)\n", ret);
 		ret = -ENOMEM;
@@ -1339,8 +1301,7 @@ int vb_queue_dqbuf(struct vb_queue *q,
 
 	if (bundle->state != VB_BUF_STATE_DONE) {
 		vision_err("dqbuf: Invalid buffer state(%X)\n", bundle->state);
-		ret = -EINVAL;
-		goto p_err;
+		return -EINVAL;
 	}
 
 	/* Fill buffer information for the userspace */

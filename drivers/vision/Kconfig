@@ -10,8 +10,10 @@ if VISION_SUPPORT
 
 source "drivers/vision/vision-core/Kconfig"
 
-source "drivers/vision/dsp/Kconfig"
-
 source "drivers/vision/npu/Kconfig"
+
+source "drivers/vision/score/Kconfig"
+
+source "drivers/vision/iva/Kconfig"
 
 endif # VISION_SUPPORT
