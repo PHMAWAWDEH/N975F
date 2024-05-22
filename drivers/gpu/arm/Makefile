@@ -1,6 +1,23 @@
-# drm/tegra depends on host1x, so if both drivers are built-in care must be
-# taken to initialize them in the correct order. Link order is the only way
-# to ensure this currently.
-obj-$(CONFIG_TEGRA_HOST1X)	+= host1x/
-obj-y			+= drm/ vga/ exynos/ arm/
-obj-$(CONFIG_IMX_IPUV3_CORE)	+= ipu-v3/
+# SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
+#
+# (C) COPYRIGHT 2021-2023 ARM Limited. All rights reserved.
+#
+# This program is free software and is provided to you under the terms of the
+# GNU General Public License version 2 as published by the Free Software
+# Foundation, and any use by you of this program is subject to the terms
+# of such GNU license.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, you can access it online at
+# http://www.gnu.org/licenses/gpl-2.0.html.
+#
+#
+
+THIS_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+
+include $(THIS_DIR)bv_r48p0/Makefile
