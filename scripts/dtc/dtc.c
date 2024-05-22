@@ -272,7 +272,7 @@ int main(int argc, char *argv[])
 #if 1
 	if (!quiet) quiet++;
 #endif
-	
+
 	if (argc > (optind+1))
 		usage("missing files");
 	else if (argc < (optind+1))
