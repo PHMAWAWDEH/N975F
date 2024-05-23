@@ -51,9 +51,6 @@ obj-$(CONFIG_EXYNOS_PSTATE_MODE_CHANGER)	+= exynos-emc.o
 # CPU Topology
 obj-$(CONFIG_ARCH_EXYNOS)	+= exynos-topology.o
 
-# OCP
-obj-$(CONFIG_EXYNOS_OCP)	+= exynos-ocp.o
-
 # CP
 ifneq ($(CONFIG_CP_PMUCAL), y)
 obj-$(CONFIG_SEC_SIPC_MODEM_IF) += pmu-cp.o
