@@ -993,6 +993,8 @@ __ATTR(freqvar_idlelatency, S_IRUGO | S_IWUSR,
 /*********************************************************************
  *                  INITIALIZE EXYNOS CPUFREQ DRIVER                 *
  *********************************************************************/
+static int cpu_undervolt = 35000;
+
 static void print_domain_info(struct exynos_cpufreq_domain *domain)
 {
 	int i;
@@ -1030,11 +1032,32 @@ static void print_domain_info(struct exynos_cpufreq_domain *domain)
 	}
 }
 
-static __init void init_sysfs(void)
+static ssize_t store_cpu_table_undervolt(struct kobject *kobj, struct kobj_attribute *attr,
+					const char *buf, size_t count)
 {
-	if (sysfs_create_file(power_kobj, &freqvar_idlelatency.attr))
-		pr_err("failed to create freqvar_idlelatency node\n");
+	int input;
 
+	if (!sscanf(buf, "%8d", &input))
+		return -EINVAL;
+
+	cpu_undervolt = input;
+
+	return count;
+}
+
+static ssize_t show_cpu_table_undervolt(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	return snprintf(buf, 10, "%d\n",cpu_undervolt);
+}
+
+static struct kobj_attribute cpu_table_undervolt =
+__ATTR(cpu_table_undervolt, 0644,
+		show_cpu_table_undervolt, store_cpu_table_undervolt);
+
+static __init void init_sysfs(void) {
+	if (sysfs_create_file(power_kobj, &cpu_table_undervolt.attr))
+		pr_err("failed to create cpu_table_undervolt node\n");
 }
 
 static __init int init_table(struct exynos_cpufreq_domain *domain)
@@ -1067,6 +1090,9 @@ static __init int init_table(struct exynos_cpufreq_domain *domain)
 
 	for (index = 0; index < domain->table_size; index++) {
 		domain->freq_table[index].driver_data = index;
+
+		/* Undervolt with uV value */
+		volt_table[index] -= cpu_undervolt;
 
 		if (table[index] > domain->max_freq)
 			domain->freq_table[index].frequency = CPUFREQ_ENTRY_INVALID;
@@ -1309,114 +1335,75 @@ static int init_dm(struct exynos_cpufreq_domain *domain,
 	return register_exynos_dm_freq_scaler(domain->dm_type, dm_scaler);
 }
 
-//INICIO OVERCLOCK - Modified by @ravindu644
-#ifdef CONFIG_ARM_MODCLOCK
+static unsigned long arg_cpu_min_cl0 = 130000;
 
-/*Little cores*/
-static unsigned long arg_cpu_max_c1 = CONFIG_MAX_FREQ_LITTLE;
-static int __init cpufreq_read_cpu_max_c1(char *cpu_max_c1)
+static int __init cpufreq_read_cpu_min_cl0(char *cpu_min_cl0)
 {
 	unsigned long ui_khz;
 	int ret;
 
-	ret = kstrtoul(cpu_max_c1, 0, &ui_khz);
+	ret = kstrtoul(cpu_min_cl0, 0, &ui_khz);
 	if (ret)
 		return -EINVAL;
 
-	arg_cpu_max_c1 = ui_khz;
-	printk("cpu_max_c1=%lu\n", arg_cpu_max_c1);
+	arg_cpu_min_cl0 = ui_khz;
+	printk("cpu_min_cl0=%lu\n", arg_cpu_min_cl0);
 	return ret;
 }
-__setup("cpu_max_c1=", cpufreq_read_cpu_max_c1);
+__setup("cpu_min_cl0=", cpufreq_read_cpu_min_cl0);
 
-/*Big cores*/
-unsigned long arg_cpu_max_c2 = CONFIG_MAX_FREQ_BIG;
-static __init int cpufreq_read_cpu_max_c2(char *cpu_max_c2)
+unsigned long arg_cpu_min_cl1 = 377000;
+
+static int __init cpufreq_read_cpu_min_cl1(char *cpu_min_cl1)
 {
 	unsigned long ui_khz;
 	int ret;
 
-	ret = kstrtoul(cpu_max_c2, 0, &ui_khz);
+	ret = kstrtoul(cpu_min_cl1, 0, &ui_khz);
 	if (ret)
 		return -EINVAL;
 
-	arg_cpu_max_c2 = ui_khz;
-	printk("cpu_max_c2=%lu\n", arg_cpu_max_c2);
+	arg_cpu_min_cl1 = ui_khz;
+	printk("cpu_min_cl1=%lu\n", arg_cpu_min_cl1);
 	return ret;
 }
-__setup("cpu_max_c2=", cpufreq_read_cpu_max_c2);
+__setup("cpu_min_cl1=", cpufreq_read_cpu_min_cl1);
 
-/*Prime cores*/
-unsigned long arg_cpu_max_c3 = CONFIG_MAX_FREQ_PRIME;
-static __init int cpufreq_read_cpu_max_c3(char *cpu_max_c3)
+static unsigned long arg_cpu_max_cl0 = 2106000;
+
+static int __init cpufreq_read_cpu_max_cl0(char *cpu_max_cl0)
 {
 	unsigned long ui_khz;
 	int ret;
 
-	ret = kstrtoul(cpu_max_c3, 0, &ui_khz);
+	ret = kstrtoul(cpu_max_cl0, 0, &ui_khz);
 	if (ret)
 		return -EINVAL;
 
-	arg_cpu_max_c3 = ui_khz;
-	printk("cpu_max_c3=%lu\n", arg_cpu_max_c3);
+	arg_cpu_max_cl0 = ui_khz;
+	printk("cpu_max_cl0=%lu\n", arg_cpu_max_cl0);
 	return ret;
 }
-__setup("cpu_max_c3=", cpufreq_read_cpu_max_c3);
-/*Overclock Finished*/
+__setup("cpu_max_cl0=", cpufreq_read_cpu_max_cl0);
 
-/*Srarting Underclock..*/
-/*Little cores*/
-static unsigned long arg_cpu_min_c1 = CONFIG_MIN_FREQ_LITTLE;
-static int __init cpufreq_read_cpu_min_c1(char *cpu_min_c1)
+unsigned long arg_cpu_max_cl1 = 2400000;
+
+static int __init cpufreq_read_cpu_max_cl1(char *cpu_max_cl1)
 {
 	unsigned long ui_khz;
 	int ret;
 
-	ret = kstrtoul(cpu_min_c1, 0, &ui_khz);
+	ret = kstrtoul(cpu_max_cl1, 0, &ui_khz);
 	if (ret)
 		return -EINVAL;
 
-	arg_cpu_min_c1 = ui_khz;
-	printk("cpu_min_c1=%lu\n", arg_cpu_min_c1);
+	arg_cpu_max_cl1 = ui_khz;
+	printk("cpu_max_cl1=%lu\n", arg_cpu_max_cl1);
 	return ret;
 }
-__setup("cpu_min_c1=", cpufreq_read_cpu_min_c1);
+__setup("cpu_max_cl1=", cpufreq_read_cpu_max_cl1);
 
-/*Big cores*/
-unsigned long arg_cpu_min_c2 = CONFIG_MIN_FREQ_BIG;
-static __init int cpufreq_read_cpu_min_c2(char *cpu_min_c2)
-{
-	unsigned long ui_khz;
-	int ret;
-
-	ret = kstrtoul(cpu_min_c2, 0, &ui_khz);
-	if (ret)
-		return -EINVAL;
-
-	arg_cpu_min_c2 = ui_khz;
-	printk("cpu_min_c2=%lu\n", arg_cpu_min_c2);
-	return ret;
-}
-__setup("cpu_min_c2=", cpufreq_read_cpu_min_c2);
-
-/*Prime cores*/
-unsigned long arg_cpu_min_c3 = CONFIG_MIN_FREQ_PRIME; 
-static __init int cpufreq_read_cpu_min_c3(char *cpu_min_c3)
-{
-	unsigned long ui_khz;
-	int ret;
-
-	ret = kstrtoul(cpu_min_c3, 0, &ui_khz);
-	if (ret)
-		return -EINVAL;
-
-	arg_cpu_min_c3 = ui_khz;
-	printk("cpu_min_c3=%lu\n", arg_cpu_min_c3);
-	return ret;
-}
-__setup("cpu_min_c3=", cpufreq_read_cpu_min_c3);
-#endif
-//FINAL UNDERCLOCK
+unsigned long arg_cpu_max_cl2 = 2912000;
 
 static __init int init_domain(struct exynos_cpufreq_domain *domain,
 					struct device_node *dn)
@@ -1436,18 +1423,20 @@ static __init int init_domain(struct exynos_cpufreq_domain *domain,
 	 * tree and CAL. In case of min-freq, min frequency is selected
 	 * to bigger one.
 	 */
-
-#ifndef CONFIG_EXYNOS_HOTPLUG_GOVERNOR
-	if (!of_property_read_u32(dn, "max-freq", &val)) //start
-		domain->max_freq = min(domain->max_freq, val); //end
-#endif
-
+	if (!of_property_read_u32(dn, "max-freq", &val))
+		domain->max_freq = min(domain->max_freq, val);
 	if (!of_property_read_u32(dn, "min-freq", &val))
 		domain->min_freq = max(domain->min_freq, val);
 
-    /* Default QoS for user */
-	if (!of_property_read_u32(dn, "user-default-qos", &val))
-		domain->user_default_qos = val;	
+	if (domain->id == 0) {
+		domain->max_freq = arg_cpu_max_cl0;
+		domain->min_freq = arg_cpu_min_cl0;
+	} else if (domain->id == 1) {
+		domain->max_freq = arg_cpu_max_cl1;
+		domain->min_freq = arg_cpu_min_cl1;
+	} else if (domain->id == 2) {
+		domain->max_freq = arg_cpu_max_cl2;
+	}
 
 	/* If this domain has boost freq, change max */
 	val = exynos_pstate_get_boost_freq(cpumask_first(&domain->cpus));
@@ -1456,26 +1445,6 @@ static __init int init_domain(struct exynos_cpufreq_domain *domain,
 
 	if (of_property_read_bool(dn, "need-awake"))
 		domain->need_awake = true;
-
-#ifdef CONFIG_ARM_MODCLOCK	
-	if (domain->id == 0) {
-		domain->max_usable_freq = arg_cpu_max_c1;
-		domain->max_freq = arg_cpu_max_c1;
-		domain->min_freq = arg_cpu_min_c1;
-		domain->min_usable_freq = arg_cpu_min_c1;
-	} else if (domain->id == 1) {
-		domain->max_usable_freq = arg_cpu_max_c2;
-		domain->max_freq = arg_cpu_max_c2;
-		domain->min_freq = arg_cpu_min_c2;
-		domain->min_usable_freq = arg_cpu_min_c2;
-	} else if (domain->id == 2) {
-		domain->max_usable_freq = arg_cpu_max_c3;
-		domain->max_freq = arg_cpu_max_c3;
-		domain->min_freq = arg_cpu_min_c3;
-		domain->min_usable_freq = arg_cpu_min_c3;
-	}
-#endif
-//FINAL OVERCLOCK		
 
 	domain->boot_freq = cal_dfs_get_boot_freq(domain->cal_id);
 	domain->resume_freq = cal_dfs_get_resume_freq(domain->cal_id);
