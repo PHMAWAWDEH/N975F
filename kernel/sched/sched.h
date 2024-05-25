@@ -56,11 +56,28 @@ struct cpuidle_state;
 
 extern __read_mostly int scheduler_running;
 
+extern unsigned long capacity_curr_of(int cpu);
+
 extern unsigned long calc_load_update;
 extern atomic_long_t calc_load_tasks;
 
 extern void calc_global_load_tick(struct rq *this_rq);
 extern long calc_load_fold_active(struct rq *this_rq, long adjust);
+
+#ifdef CONFIG_HZ_300
+/*
+ * Tick interval becomes to 3333333 due to
+ * rounding error when HZ=300.
+ */
+#define MIN_SCHED_RAVG_WINDOW (3333333 * 6)
+#else
+/* Min window size (in ns) = 20ms */
+#define MIN_SCHED_RAVG_WINDOW 20000000
+#endif
+
+/* Max window size (in ns) = 1s */
+#define MAX_SCHED_RAVG_WINDOW 1000000000
+extern unsigned int sched_ravg_window;
 
 #ifdef CONFIG_SMP
 extern void cpu_load_update_active(struct rq *this_rq);
@@ -2189,6 +2206,23 @@ struct _eenv_debug {
 	unsigned long cpu_util[1];
 };
 #endif
+
+/* EAS governors */
+#ifdef CONFIG_SMP
+struct sched_walt_cpu_load {
+	unsigned long prev_window_util;
+	unsigned long nl;
+	unsigned long pl;
+	u64 ws;
+};
+#endif
+
+#ifdef CONFIG_SCHED_WALT
+extern unsigned long
+boosted_cpu_util(int cpu, unsigned long other_util);
+#endif
+
+extern inline unsigned long cpu_util_freq(int cpu);
 
 struct eenv_cpu {
 	/* CPU ID, must be in cpus_mask */
