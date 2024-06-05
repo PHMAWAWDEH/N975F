@@ -548,6 +548,9 @@ endif
 # CC is clang, Turn on integrated AS if CC is clang 14 or later version
 ifeq ($(shell [ $(call __cc-version) -ge 1400 ] && echo 14),)
 CLANG_FLAGS	+= -no-integrated-as
+else
+LLVM_IAS        := 1
+endif
 CLANG_FLAGS	+= -Werror=unknown-warning-option
 KBUILD_CFLAGS	+= $(CLANG_FLAGS)
 KBUILD_AFLAGS	+= $(CLANG_FLAGS)
@@ -2028,5 +2031,4 @@ FORCE:
 # Declare the contents of the .PHONY variable as phony.  We keep that
 # information in a variable so we can use it in if_changed and friends.
 .PHONY: $(PHONY)
-
 endif
