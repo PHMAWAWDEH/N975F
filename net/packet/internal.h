@@ -115,9 +115,10 @@ struct packet_sock {
 	int			copy_thresh;
 	spinlock_t		bind_lock;
 	struct mutex		pg_vec_lock;
-        unsigned long		flags;
+	unsigned long		flags;
 	unsigned int		running;	/* bind_lock must be held */
-	unsigned int		has_vnet_hdr:1, /* writer must hold sock lock */
+	unsigned int		auxdata:1,	/* writer must hold sock lock */
+				has_vnet_hdr:1,
 				tp_loss:1,
 				tp_tx_has_off:1;
 	int			pressure;
