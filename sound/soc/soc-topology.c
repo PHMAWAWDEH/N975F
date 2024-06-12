@@ -421,7 +421,7 @@ static int soc_tplg_add_kcontrol(struct soc_tplg *tplg,
 	struct snd_soc_component *comp = tplg->comp;
 
 	return soc_tplg_add_dcontrol(comp->card->snd_card,
-				comp->dev, k, comp->name_prefix, comp, kcontrol);
+				comp->dev, k, NULL, comp, kcontrol);
 }
 
 /* remove a mixer kcontrol */
@@ -599,8 +599,7 @@ static int soc_tplg_kcontrol_bind_io(struct snd_soc_tplg_ctl_hdr *hdr,
 
 	if (hdr->ops.info == SND_SOC_TPLG_CTL_BYTES
 		&& k->iface & SNDRV_CTL_ELEM_IFACE_MIXER
-		&& (k->access & SNDRV_CTL_ELEM_ACCESS_TLV_READ
-		    || k->access & SNDRV_CTL_ELEM_ACCESS_TLV_WRITE)
+		&& k->access & SNDRV_CTL_ELEM_ACCESS_TLV_READWRITE
 		&& k->access & SNDRV_CTL_ELEM_ACCESS_TLV_CALLBACK) {
 		struct soc_bytes_ext *sbe;
 		struct snd_soc_tplg_bytes_control *be;
@@ -1922,7 +1921,6 @@ static int soc_tplg_pcm_elems_load(struct soc_tplg *tplg,
 	int count = hdr->count;
 	int i;
 	bool abi_match;
-	int ret;
 
 	if (tplg->pass != SOC_TPLG_PASS_PCM_DAI)
 		return 0;
@@ -1955,18 +1953,11 @@ static int soc_tplg_pcm_elems_load(struct soc_tplg *tplg,
 			_pcm = pcm;
 		} else {
 			abi_match = false;
-			ret = pcm_new_ver(tplg, pcm, &_pcm);
-			if (ret < 0)
-				return ret;
+			pcm_new_ver(tplg, pcm, &_pcm);
 		}
 
 		/* create the FE DAIs and DAI links */
-		ret = soc_tplg_pcm_create(tplg, _pcm);
-		if (ret < 0) {
-			if (!abi_match)
-				kfree(_pcm);
-			return ret;
-		}
+		soc_tplg_pcm_create(tplg, _pcm);
 
 		/* offset by version-specific struct size and
 		 * real priv data size
@@ -2180,11 +2171,8 @@ static int soc_tplg_link_elems_load(struct soc_tplg *tplg,
 		}
 
 		ret = soc_tplg_link_config(tplg, _link);
-		if (ret < 0) {
-			if (!abi_match)
-				kfree(_link);
+		if (ret < 0)
 			return ret;
-		}
 
 		/* offset by version-specific struct size and
 		 * real priv data size
@@ -2336,7 +2324,7 @@ static int soc_tplg_manifest_load(struct soc_tplg *tplg,
 {
 	struct snd_soc_tplg_manifest *manifest, *_manifest;
 	bool abi_match;
-	int ret = 0;
+	int err;
 
 	if (tplg->pass != SOC_TPLG_PASS_MANIFEST)
 		return 0;
@@ -2349,19 +2337,19 @@ static int soc_tplg_manifest_load(struct soc_tplg *tplg,
 		_manifest = manifest;
 	} else {
 		abi_match = false;
-		ret = manifest_new_ver(tplg, manifest, &_manifest);
-		if (ret < 0)
-			return ret;
+		err = manifest_new_ver(tplg, manifest, &_manifest);
+		if (err < 0)
+			return err;
 	}
 
 	/* pass control to component driver for optional further init */
 	if (tplg->comp && tplg->ops && tplg->ops->manifest)
-		ret = tplg->ops->manifest(tplg->comp, _manifest);
+		return tplg->ops->manifest(tplg->comp, _manifest);
 
 	if (!abi_match)	/* free the duplicated one */
 		kfree(_manifest);
 
-	return ret;
+	return 0;
 }
 
 /* validate header magic, size and type */
@@ -2586,7 +2574,6 @@ EXPORT_SYMBOL_GPL(snd_soc_tplg_widget_remove_all);
 /* remove dynamic controls from the component driver */
 int snd_soc_tplg_component_remove(struct snd_soc_component *comp, u32 index)
 {
-	struct snd_card *card = comp->card->snd_card;
 	struct snd_soc_dobj *dobj, *next_dobj;
 	int pass = SOC_TPLG_PASS_END;
 
@@ -2594,7 +2581,6 @@ int snd_soc_tplg_component_remove(struct snd_soc_component *comp, u32 index)
 	while (pass >= SOC_TPLG_PASS_START) {
 
 		/* remove mixer controls */
-		down_write(&card->controls_rwsem);
 		list_for_each_entry_safe(dobj, next_dobj, &comp->dobj_list,
 			list) {
 
@@ -2628,7 +2614,6 @@ int snd_soc_tplg_component_remove(struct snd_soc_component *comp, u32 index)
 				break;
 			}
 		}
-		up_write(&card->controls_rwsem);
 		pass--;
 	}
 
