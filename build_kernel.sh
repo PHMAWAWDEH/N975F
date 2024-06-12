@@ -28,8 +28,8 @@ export DEVICE="Note 10+"
 export KBUILD_BUILD_USER="@ravindu644"
 export LLVM=1
 export ARCH=arm64
-export PLATFORM_VERSION=13
-export ANDROID_MAJOR_VERSION=t
+export PLATFORM_VERSION=14
+export ANDROID_MAJOR_VERSION=u
 
 export ARGS="
 CC=clang
