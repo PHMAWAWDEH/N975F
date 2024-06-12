@@ -30,7 +30,6 @@
 #include <asm/cpu.h>
 #include <asm/cpufeature.h>
 #include <asm/cpu_ops.h>
-#include <asm/hwcap.h>
 #include <asm/mmu_context.h>
 #include <asm/processor.h>
 #include <asm/sysreg.h>
@@ -112,11 +111,6 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
  * sync with the documentation of the CPU feature register ABI.
  */
 static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
-	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_DP_SHIFT, 4, 0),
-	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_SM4_SHIFT, 4, 0),
-	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_SM3_SHIFT, 4, 0),
-	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_SHA3_SHIFT, 4, 0),
-	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_TS_SHIFT, 4, 0),
 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_FHM_SHIFT, 4, 0),
 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_DP_SHIFT, 4, 0),
@@ -152,10 +146,11 @@ static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
 	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
 	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
+	/* Linux doesn't care about the EL3 */
 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_EL3_SHIFT, 4, 0),
-	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_EL2_SHIFT, 4, 0),
-	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_EL1_SHIFT, 4, ID_AA64PFR0_EL1_64BIT_ONLY),
-	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_EL0_SHIFT, 4, ID_AA64PFR0_EL0_64BIT_ONLY),
+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_EL2_SHIFT, 4, 0),
+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_EL1_SHIFT, 4, ID_AA64PFR0_EL1_64BIT_ONLY),
+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_EL0_SHIFT, 4, ID_AA64PFR0_EL0_64BIT_ONLY),
 	ARM64_FTR_END,
 };
 
@@ -246,8 +241,7 @@ static const struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
 	 * of support.
 	 */
 	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
-	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
-	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_EXACT, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
 	ARM64_FTR_END,
 };
 
@@ -289,7 +283,7 @@ static const struct arm64_ftr_bits ftr_id_pfr0[] = {
 
 static const struct arm64_ftr_bits ftr_id_dfr0[] = {
 	/* [31:28] TraceFilt */
-	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 24, 4, 0xf),	/* PerfMon */
+	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, 24, 4, 0xf),	/* PerfMon */
 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),
 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 0),
 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, 12, 4, 0),
@@ -646,6 +640,9 @@ void update_cpu_features(int cpu,
 	taint |= check_update_ftr_reg(SYS_ID_AA64MMFR2_EL1, cpu,
 				      info->reg_id_aa64mmfr2, boot->reg_id_aa64mmfr2);
 
+	/*
+	 * EL3 is not our concern.
+	 */
 	taint |= check_update_ftr_reg(SYS_ID_AA64PFR0_EL1, cpu,
 				      info->reg_id_aa64pfr0, boot->reg_id_aa64pfr0);
 	taint |= check_update_ftr_reg(SYS_ID_AA64PFR1_EL1, cpu,
@@ -851,7 +848,6 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
-		{ /* sentinel */ }
 	};
 	char const *str = "kpti command line option";
 	bool meltdown_safe;
@@ -904,7 +900,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
 }
 
 #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-static void __nocfi
+static void
 kpti_install_ng_mappings(const struct arm64_cpu_capabilities *__unused)
 {
 	typedef void (kpti_remap_fn)(int, int, phys_addr_t);
@@ -981,7 +977,7 @@ static int ssbs_emulation_handler(struct pt_regs *regs, u32 instr)
 	if (user_mode(regs))
 		return 1;
 
-	if (instr & BIT(PSTATE_Imm_shift))
+	if (instr & BIT(CRm_shift))
 		regs->pstate |= PSR_SSBS_BIT;
 	else
 		regs->pstate &= ~PSR_SSBS_BIT;
@@ -991,8 +987,8 @@ static int ssbs_emulation_handler(struct pt_regs *regs, u32 instr)
 }
 
 static struct undef_hook ssbs_emulation_hook = {
-	.instr_mask	= ~(1U << PSTATE_Imm_shift),
-	.instr_val	= 0xd500401f | PSTATE_SSBS,
+	.instr_mask	= ~(1U << CRm_shift),
+	.instr_val	= 0xd500001f | REG_PSTATE_SSBS_IMM,
 	.fn		= ssbs_emulation_handler,
 };
 
@@ -1016,14 +1012,6 @@ static void cpu_enable_ssbs(const struct arm64_cpu_capabilities *__unused)
 	}
 }
 #endif /* CONFIG_ARM64_SSBD */
-
-static void elf_hwcap_fixup(void)
-{
-#ifdef CONFIG_ARM64_ERRATUM_1742098
-	if (cpus_have_const_cap(ARM64_WORKAROUND_1742098))
-		compat_elf_hwcap2 &= ~COMPAT_HWCAP2_AES;
-#endif /* ARM64_ERRATUM_1742098 */
-}
 
 static const struct arm64_cpu_capabilities arm64_features[] = {
 	{
@@ -1132,7 +1120,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
 	{
 		/* FP/SIMD is not implemented */
 		.capability = ARM64_HAS_NO_FPSIMD,
-		.type = ARM64_CPUCAP_BOOT_RESTRICTED_CPU_LOCAL_FEATURE,
+		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
 		.min_field_value = 0,
 		.matches = has_no_fpsimd,
 	},
@@ -1163,7 +1151,6 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
 	{},
 };
 
-
 #define HWCAP_CPUID_MATCH(reg, field, s, min_value)		\
 		.matches = has_cpuid_feature,			\
 		.sys_reg = reg,					\
@@ -1171,17 +1158,24 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
 		.sign = s,					\
 		.min_field_value = min_value,			\
 
+#define HWCAP_CAP(reg, field, s, min_value, cap_type, cap)	\
+	{							\
+		.desc = #cap,					\
+		.type = ARM64_CPUCAP_SYSTEM_FEATURE,		\
+		.matches = has_cpuid_feature,			\
+		.sys_reg = reg,					\
+		.field_pos = field,				\
+		.sign = s,					\
+		.min_field_value = min_value,			\
+		.hwcap_type = cap_type,				\
+		.hwcap = cap,					\
+	}
+
 #define __HWCAP_CAP(name, cap_type, cap)			\
 		.desc = name,					\
 		.type = ARM64_CPUCAP_SYSTEM_FEATURE,		\
 		.hwcap_type = cap_type,				\
 		.hwcap = cap,					\
-
-#define HWCAP_CAP(reg, field, s, min_value, cap_type, cap)	\
-	{							\
-		__HWCAP_CAP(#cap, cap_type, cap)		\
-		HWCAP_CPUID_MATCH(reg, field, s, min_value)	\
-	}
 
 #define HWCAP_CAP_MATCH(match, cap_type, cap)			\
 	{							\
@@ -1347,9 +1341,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
 
 static void update_cpu_capabilities(u16 scope_mask)
 {
+	__update_cpu_capabilities(arm64_features, scope_mask, "detected:");
 	__update_cpu_capabilities(arm64_errata, scope_mask,
 				  "enabling workaround for");
-	__update_cpu_capabilities(arm64_features, scope_mask, "detected:");
 }
 
 static int __enable_cpu_capability(void *arg)
@@ -1404,8 +1398,8 @@ __enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
 
 static void __init enable_cpu_capabilities(u16 scope_mask)
 {
-	__enable_cpu_capabilities(arm64_errata, scope_mask);
 	__enable_cpu_capabilities(arm64_features, scope_mask);
+	__enable_cpu_capabilities(arm64_errata, scope_mask);
 }
 
 /*
@@ -1603,10 +1597,8 @@ void __init setup_cpu_features(void)
 	mark_const_caps_ready();
 	setup_elf_hwcaps(arm64_elf_hwcaps);
 
-	if (system_supports_32bit_el0()) {
+	if (system_supports_32bit_el0())
 		setup_elf_hwcaps(compat_elf_hwcaps);
-		elf_hwcap_fixup();
-	}
 
 	/* Advertise that we have computed the system capabilities */
 	set_sys_caps_initialised();
