@@ -964,7 +964,7 @@ static int ssbs_emulation_handler(struct pt_regs *regs, u32 instr)
 
 static struct undef_hook ssbs_emulation_hook = {
 	.instr_mask	= ~(1U << CRm_shift),
-	.instr_val	= 0xd500401f | PSTATE_SSBS,
+	.instr_val	=  0xd500001f | REG_PSTATE_SSBS_IMM,
 	.fn		= ssbs_emulation_handler,
 };
 
