@@ -35,7 +35,7 @@
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
 #endif
-#include "edid.h"
+#include "../edid.h"
 
 /*
  * EDID parser
