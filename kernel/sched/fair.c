@@ -4952,7 +4952,8 @@ static enum hrtimer_restart sched_cfs_period_timer(struct hrtimer *timer)
 		container_of(timer, struct cfs_bandwidth, period_timer);
 	int overrun;
 	int idle = 0;
-
+        int count = 0;
+	
 	raw_spin_lock(&cfs_b->lock);
 	for (;;) {
 		overrun = hrtimer_forward_now(timer, cfs_b->period);
