@@ -1330,3 +1330,4 @@ static void __exit manager_notifier_exit(void)
 
 late_initcall(manager_notifier_init);
 module_exit(manager_notifier_exit);
+

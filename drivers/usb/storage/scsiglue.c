@@ -81,7 +81,6 @@ static const char* host_info(struct Scsi_Host *host)
 static int slave_alloc (struct scsi_device *sdev)
 {
 	struct us_data *us = host_to_us(sdev->host);
-	int maxp;
 
 	/*
 	 * Set the INQUIRY transfer length to 36.  We don't use any of
@@ -89,15 +88,6 @@ static int slave_alloc (struct scsi_device *sdev)
 	 * less than 36 bytes.
 	 */
 	sdev->inquiry_len = 36;
-
-	/*
-	 * USB has unusual scatter-gather requirements: the length of each
-	 * scatterlist element except the last must be divisible by the
-	 * Bulk maxpacket value.  Fortunately this value is always a
-	 * power of 2.  Inform the block layer about this requirement.
-	 */
-	maxp = usb_maxpacket(us->pusb_dev, us->recv_bulk_pipe, 0);
-	blk_queue_virt_boundary(sdev->request_queue, maxp - 1);
 
 	/*
 	 * Some host controllers may have alignment requirements.
@@ -389,10 +379,6 @@ static int queuecommand_lck(struct scsi_cmnd *srb,
 	/* fail the command if we are disconnecting */
 	if (test_bit(US_FLIDX_DISCONNECTING, &us->dflags)) {
 		usb_stor_dbg(us, "Fail command during disconnect\n");
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
-		printk(KERN_ERR USB_STORAGE "%s, Fail command during disconnect\n",
-				__func__);
-#endif
 		srb->result = DID_NO_CONNECT << 16;
 		done(srb);
 		return 0;
@@ -422,28 +408,25 @@ static DEF_SCSI_QCMD(queuecommand)
  ***********************************************************************/
 
 /* Command timeout and abort */
-static int command_abort(struct scsi_cmnd *srb)
+static int command_abort_matching(struct us_data *us, struct scsi_cmnd *srb_match)
 {
-	struct us_data *us = host_to_us(srb->device->host);
-
-	usb_stor_dbg(us, "%s called\n", __func__);
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
-	printk(KERN_ERR USB_STORAGE "%s scsi_lock +\n", __func__);
-#endif
 	/*
 	 * us->srb together with the TIMED_OUT, RESETTING, and ABORTING
 	 * bits are protected by the host lock.
 	 */
 	scsi_lock(us_to_host(us));
 
-	/* Is this command still active? */
-	if (us->srb != srb) {
+	/* is there any active pending command to abort ? */
+	if (!us->srb) {
 		scsi_unlock(us_to_host(us));
 		usb_stor_dbg(us, "-- nothing to abort\n");
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
-		printk(KERN_ERR USB_STORAGE "%s -- nothing to abort -\n",
-				__func__);
-#endif		
+		return SUCCESS;
+	}
+
+	/* Does the command match the passed srb if any ? */
+	if (srb_match && us->srb != srb_match) {
+		scsi_unlock(us_to_host(us));
+		usb_stor_dbg(us, "-- pending command mismatch\n");
 		return FAILED;
 	}
 
@@ -460,16 +443,18 @@ static int command_abort(struct scsi_cmnd *srb)
 		usb_stor_stop_transport(us);
 	}
 	scsi_unlock(us_to_host(us));
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
-	printk(KERN_ERR USB_STORAGE "%s scsi_unlock\n", __func__);
-#endif
 
 	/* Wait for the aborted command to finish */
 	wait_for_completion(&us->notify);
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
-	printk(KERN_ERR USB_STORAGE "%s -\n", __func__);
-#endif
 	return SUCCESS;
+}
+
+static int command_abort(struct scsi_cmnd *srb)
+{
+	struct us_data *us = host_to_us(srb->device->host);
+
+	usb_stor_dbg(us, "%s called\n", __func__);
+	return command_abort_matching(us, srb);
 }
 
 /*
@@ -482,6 +467,9 @@ static int device_reset(struct scsi_cmnd *srb)
 	int result;
 
 	usb_stor_dbg(us, "%s called\n", __func__);
+
+	/* abort any pending command before reset */
+	command_abort_matching(us, NULL);
 
 	/* lock the device pointers and do the reset */
 	mutex_lock(&(us->dev_mutex));
@@ -528,15 +516,10 @@ void usb_stor_report_device_reset(struct us_data *us)
 void usb_stor_report_bus_reset(struct us_data *us)
 {
 	struct Scsi_Host *host = us_to_host(us);
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
-	printk(KERN_ERR USB_STORAGE "%s scsi_lock\n", __func__);
-#endif
+
 	scsi_lock(host);
 	scsi_report_bus_reset(host, 0);
 	scsi_unlock(host);
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
-	printk(KERN_ERR USB_STORAGE "%s scsi_unlock\n", __func__);
-#endif
 }
 
 /***********************************************************************
