@@ -863,7 +863,8 @@ bool blk_rq_merge_ok(struct request *rq, struct bio *bio)
 
 enum elv_merge blk_try_merge(struct request *rq, struct bio *bio)
 {
-	if (blk_discard_mergable(rq))
+	if (req_op(rq) == REQ_OP_DISCARD &&
+	    queue_max_discard_segments(rq->q) > 1) {
 		return ELEVATOR_DISCARD_MERGE;
 	} else if (blk_rq_pos(rq) + blk_rq_sectors(rq) ==
 						bio->bi_iter.bi_sector) {
