@@ -825,14 +825,6 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
 		handler[reason], smp_processor_id(), esr,
 		esr_get_class_string(esr));
 
-#ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
-	if (!user_mode(regs)) {
-		sec_debug_set_extra_info_fault(BAD_MODE_FAULT, (unsigned long)regs->pc, regs);
-		sec_debug_set_extra_info_esr(esr);
-	}
-#endif
-
-	die("Oops - bad mode", regs, 0);
 	local_irq_disable();
 	panic("bad mode");
 }
